@@ -1,0 +1,15 @@
+{
+    "CardSize": 5,
+    "Debug": true,
+    "DiscordLink": "https://discord.gg/YjdDtT8q",
+    "Font": "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "LogLevel": "debug",
+    "Mode": "discord",
+    "RetroactiveCalls": true,
+    "StreamerName": "Max",
+    "StreamURL": "https://www.youtube.com/channel/UC-0WjH-efG2qvNlZUBlX70Q/live",
+    "TokenFile": "config/token.txt",
+    "UseFreeSpace": true,
+    "YTChannelID": "UC-0WjH-efG2qvNlZUBlX70Q",
+    "YTCredFile": "client_secrets.json"
+}

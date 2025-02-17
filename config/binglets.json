@@ -1,0 +1,50 @@
+{
+    "bings": {
+        "Characters": [
+            "Playing as a biker",
+            "Playing as a gangster",
+            "Playing as character \"Cletus\"",
+            "Playing as character \"Floyd\"",
+            "Playing as character \"Lil D\"",
+            "Playing as character \"Megaphone\"",
+            "Playing as character \"Montez\"",
+            "Playing as character \"Mort\"",
+            "Playing as character \"Ricky\"",
+            "Playing as character \"Ronnie\"",
+            "Playing as character \"Steven Seagull\"",
+            "Playing as new character"
+        ],
+        "Deaths": [
+            "Death by animal",
+            "Death by drowning",
+            "Death by explosion",
+            "Death by fire",
+            "Death by stabbing"
+        ],
+        "Max gets...": [
+            "Max gets Fini global banned",
+            "Max gets RDMed",
+            "Max gets VDMed",
+            "Max gets recognized in game",
+            "Jett appears on stream",
+            "Max crashes out"
+        ],
+        "Misc": [
+            "$100+ donation",
+            "1000 concurrent stream viewers",
+            "5+ hour stream",
+            "Banned from server",
+            "ERP spotted",
+            "Furry in stream",
+            "Hard RE in stream",
+            "Player is a minor",
+            "PC check",
+            "Player crashes out",
+            "Player locked out of their car",
+            "Server nuked",
+            "Smoke detector BEEP",
+            "Stream sniped",
+            "Stream technical problems"
+        ]
+    }
+}
