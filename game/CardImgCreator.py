@@ -86,16 +86,6 @@ class CardImgCreator:
 
                 draw.multiline_text((textX, textY), text, fill=(0, 0, 0, 255), font=font, align="center")
 
-                # Get the text dimensions
-                #textWidth = draw.textlength(text, font=font)
-                #bbox = font.getbbox(text)
-                #textHeight = bbox[3] - bbox[1]
-
-                # Draw the text string
-                #textX = topLeft[0] + (CardImgCreator.__SIZE_CELLS - textWidth) / 2
-                #textY = topLeft[1] + (CardImgCreator.__SIZE_CELLS - textHeight) / 2
-                #draw.text((textX, textY), text, fill=(0, 0, 0, 255), font=font)
-
         return overlay
 
     def _getCellStrs(self, card: Card) -> list:

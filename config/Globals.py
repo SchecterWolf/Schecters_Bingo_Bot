@@ -17,8 +17,9 @@ class GLOBALVARS:
     FILE_CONFIG_GENERAL = PROJ_ROOT + "/config/config.json"
     FILE_CONFIG_BINGLETS = PROJ_ROOT + "/config/binglets.json"
     FILE_PLAYER_DATA = DIR_DATA + "/players.json"
-    IMAGE_CARD_BG = DIR_RESOURCES + "/assets/CardBG.jpg"
     IMAGE_CALL_ICON = DIR_RESOURCES + "/assets/CallIcon.png"
+    IMAGE_CARD_BG = DIR_RESOURCES + "/assets/CardBG.jpg"
+    IMAGE_GLOBAL_BOARD = DIR_RESOURCES + "/assets/GameGlobalBoard.png"
 
     CHANNEL_BINGO = "bingo"
     CHANNEL_ADMIN_BINGO ="bingo-admin"

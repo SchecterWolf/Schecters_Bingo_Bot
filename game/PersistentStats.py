@@ -46,21 +46,24 @@ class PersistentStats():
         for player in players:
             playerName = player.card.getCardOwner()
             playerStatData = self._getPlayerStats(playerName)
+            playerID: int = cast(int, playerStatData[PersistentStats.ITEM_ID])
+            playerData: TypeDataStat = cast(TypeDataStat, playerStatData[PersistentStats.ITEM_DATA])
 
+            # TODO SCH
             # Update bingos
             if player.card.hasBingo():
-                playerStats[PersistentStats.DATA_ITEM_BINGOS] += 1
-                self._processStat(self.topBingos, playerName, playerStats[PersistentStats.DATA_ITEM_BINGOS])
+                playerData[PersistentStats.DATA_ITEM_BINGOS] += 1
+                self._processStat(self.topBingos, playerName, playerID, playerData[PersistentStats.DATA_ITEM_BINGOS])
 
             # Update num calls
             numCalls = player.card.getNumMarked()
             if numCalls:
-                playerStats[PersistentStats.DATA_ITEM_CALLS] += numCalls
-                self._processStat(self.topBingos, playerName, playerStats[PersistentStats.DATA_ITEM_CALLS])
+                playerData[PersistentStats.DATA_ITEM_CALLS] += numCalls
+                self._processStat(self.topBingos, playerName, playerID, playerData[PersistentStats.DATA_ITEM_CALLS])
 
             # Update games played
-            playerStats[PersistentStats.DATA_ITEM_GAMES] += 1
-            self._processStat(self.topBingos, playerName, playerStats[PersistentStats.DATA_ITEM_GAMES])
+            playerData[PersistentStats.DATA_ITEM_GAMES] += 1
+            self._processStat(self.topBingos, playerName, playerID, playerData[PersistentStats.DATA_ITEM_GAMES])
 
             # Update the internal stats member
             self.playerData[playerName] = playerStatData
