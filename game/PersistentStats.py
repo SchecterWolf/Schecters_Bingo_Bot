@@ -6,36 +6,65 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
+import datetime
 import json
 
 from .Player import Player
 
-from config.ClassLogger import ClassLogger
-from config.Config import GLOBALVARS
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
+from config.Config import Config
+from config.Globals import GLOBALVARS
+from game.SavedData import SavedData
 from pathlib import Path
-from typing import Deque, Dict, List, Tuple, Union, cast
+from typing import Deque, Dict, List, Union, cast
 
-TypeStat = Tuple[str, int, int] # Player name, ID, Value
 TypeDataStat = Dict[str, int]
-TypePlayerData = Dict[str, Union[int, TypeDataStat]]
+TypePlayerData = Dict[str, Union[str, TypeDataStat]]
 TypePlayerEntry = Dict[str, TypePlayerData]
+
+class PlayerOrdinal:
+    def __init__(self, playerID: int, name: str = "", ):
+        self.playerID = playerID
+        self.name = name
+
+        self.stats: dict[str, TypeDataStat] = {}
+        for cType in PersistentStats.LIST_CATEGORY_ITEMS:
+            self.stats[cType] = {}
+            for dType in PersistentStats.LIST_DATA_ITEMS:
+                self.stats[cType][dType] = 0
+
+        self.points: dict[str, int] = {}
+        for cType in PersistentStats.LIST_CATEGORY_ITEMS:
+            self.points[cType] = 0
 
 class PersistentStats():
     __LOGGER = ClassLogger(__name__)
 
-    ITEM_DATA = "stats"
-    ITEM_ID = "id"
+    ITEM_NAME = "name"
+    ITEM_TOTAL = "total"
+    ITEM_MONTH = "month"
+    ITEM_WEEK = "week"
 
     DATA_ITEM_BINGOS = "bingos"
     DATA_ITEM_CALLS = "calls"
     DATA_ITEM_GAMES = "games"
 
-    def __init__(self):
-        self.topBingos: Deque[TypeStat] = Deque()
-        self.topCalls: Deque[TypeStat] = Deque()
-        self.topGames: Deque[TypeStat] = Deque()
+    LIST_DATA_ITEMS = [DATA_ITEM_BINGOS, DATA_ITEM_CALLS, DATA_ITEM_GAMES]
+    LIST_CATEGORY_ITEMS = [ITEM_TOTAL, ITEM_MONTH, ITEM_WEEK]
 
+    def __init__(self):
+        cfg = Config()
+        self.bonuses: dict[str, int] = {
+            PersistentStats.DATA_ITEM_BINGOS: cfg.getConfig("BonusBingo", 1),
+            PersistentStats.DATA_ITEM_CALLS: cfg.getConfig("BonusSlotsCalled", 1),
+            PersistentStats.DATA_ITEM_GAMES: cfg.getConfig("BonusGamesPlayed", 1)
+        }
+
+        self.topPlayers: dict[str, Deque] = {
+            PersistentStats.ITEM_TOTAL: Deque(),
+            PersistentStats.ITEM_MONTH: Deque(),
+            PersistentStats.ITEM_WEEK: Deque(),
+        }
         self.filePlayerData = Path(GLOBALVARS.FILE_PLAYER_DATA)
         self.playerData: TypePlayerEntry = dict()
 
@@ -43,32 +72,53 @@ class PersistentStats():
 
     def updateFromPlayers(self, players: List[Player]):
         PersistentStats.__LOGGER.log(LogLevel.LEVEL_INFO, "Updating player game data.")
+
         for player in players:
+            if player.userID < 0:
+                continue
+
             playerName = player.card.getCardOwner()
-            playerStatData = self._getPlayerStats(playerName)
+            playerID = player.userID
+            playerStatData: TypePlayerData = self._getPlayerStats(playerID)
 
-            # Update bingos
-            if player.card.hasBingo():
-                playerStats[PersistentStats.DATA_ITEM_BINGOS] += 1
-                self._processStat(self.topBingos, playerName, playerStats[PersistentStats.DATA_ITEM_BINGOS])
+            for cType in PersistentStats.LIST_CATEGORY_ITEMS:
+                stat = cast(TypeDataStat, playerStatData[cType])
 
-            # Update num calls
-            numCalls = player.card.getNumMarked()
-            if numCalls:
-                playerStats[PersistentStats.DATA_ITEM_CALLS] += numCalls
-                self._processStat(self.topBingos, playerName, playerStats[PersistentStats.DATA_ITEM_CALLS])
+                # Update bingos
+                if player.card.hasBingo():
+                    stat[PersistentStats.DATA_ITEM_BINGOS] += 1
 
-            # Update games played
-            playerStats[PersistentStats.DATA_ITEM_GAMES] += 1
-            self._processStat(self.topBingos, playerName, playerStats[PersistentStats.DATA_ITEM_GAMES])
+                # Update num calls
+                numCalls = player.card.getNumMarked()
+                if numCalls:
+                    stat[PersistentStats.DATA_ITEM_CALLS] += numCalls
 
-            # Update the internal stats member
+                # Update games played
+                stat[PersistentStats.DATA_ITEM_GAMES] += 1
+
             self.playerData[playerName] = playerStatData
+
+        # Update the internal top players
+        self._loadPlayerData()
 
         # Save the new updated stats
         with self.filePlayerData.open("w") as file:
             json.dump(self.playerData, file, indent=4)
             PersistentStats.__LOGGER.log(LogLevel.LEVEL_INFO, "Player data saved.")
+
+        # Save timestamps
+        SavedData().saveData("weekID", str(datetime.date.today().isocalendar()[1]))
+        SavedData().saveData("monthID", str(datetime.date.today().month))
+
+    def getBonus(self, bType: str) -> int:
+        return self.bonuses.get(bType, 0)
+
+    def getTopPlayer(self, place: int, category: str = ITEM_TOTAL) -> Union[PlayerOrdinal, None]:
+        ret = None
+        leaderboard = self.topPlayers.get(category)
+        if leaderboard and place - 1 < len(leaderboard):
+            ret = leaderboard[place -1]
+        return ret
 
     def _readInPlayerData(self):
         PersistentStats.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Reading in saved player data...")
@@ -76,37 +126,60 @@ class PersistentStats():
             with self.filePlayerData.open("r") as file:
                 self.playerData = json.load(file)
 
-        for key, val in self.playerData.items():
-            playerID: int = cast(int, val[PersistentStats.ITEM_ID])
-            playerData: TypeDataStat = cast(TypeDataStat, val[PersistentStats.ITEM_DATA])
-            self._processStat(self.topBingos, key, playerID, playerData[PersistentStats.DATA_ITEM_BINGOS])
-            self._processStat(self.topCalls, key, playerID, playerData[PersistentStats.DATA_ITEM_CALLS])
-            self._processStat(self.topGames, key, playerID, playerData[PersistentStats.DATA_ITEM_GAMES])
+        self._loadPlayerData()
 
-    def _processStat(self, queue: Deque[TypeStat], player: str, playerID: int, num: int):
-        stat: TypeStat = (player, playerID, num)
-        if not queue and num:
-            queue.appendleft(stat)
+    def _loadPlayerData(self):
+        currentWeekID = datetime.date.today().isocalendar()[1]
+        currentMonthID = datetime.date.today().month
+        savedWeekID = int(SavedData().getData("weekID") or 0)
+        savedMonthID = int(SavedData().getData("monthID") or 0)
+
+        # Clear out top players
+        for cType in PersistentStats.LIST_CATEGORY_ITEMS:
+            self.topPlayers[cType].clear()
+
+        # Populate the top players
+        for key, val in self.playerData.items():
+            playerID: int = int(key)
+            name: str = cast(str, val[PersistentStats.ITEM_NAME])
+            for cType in PersistentStats.LIST_CATEGORY_ITEMS:
+                player = PlayerOrdinal(playerID, name)
+
+                # Null out the month/week stats if we're currently elapsed
+                stats:TypeDataStat = cast(TypeDataStat, val[cType])
+                if (cType == PersistentStats.ITEM_MONTH and currentMonthID > savedMonthID)\
+                    or (cType == PersistentStats.ITEM_WEEK and currentWeekID > savedWeekID):
+                    stats = cast(TypeDataStat, self._getPlayerStats(-1)[cType])
+                self._processStats(player, cType, stats)
+        print(",".join(f"{st.name}({st.points['total']})" for st in self.topPlayers["total"])) # TODO SCH rm
+
+    def _processStats(self, player: PlayerOrdinal, cType: str, stats: TypeDataStat):
+        for dType in PersistentStats.LIST_DATA_ITEMS:
+            val = stats.get(dType, 0)
+            player.stats[cType][dType] = val
+            player.points[cType] += val * self.bonuses[dType]
+
+        leaderboard = self.topPlayers[cType]
+        if not leaderboard:
+            leaderboard.appendleft(player)
             return
 
         idx = 0
-        for index, qStat in enumerate(queue):
-            if num >= qStat[1]:
+        for index, qStat in enumerate(leaderboard):
+            if player.points[cType] >= qStat.points[cType]:
                 break
             idx = index + 1
-        queue.insert(idx, stat)
+        leaderboard.insert(idx, player)
 
-        if len(queue) > 3:
-            queue.pop()
+        if len(self.topPlayers) > 3:
+            leaderboard.pop()
 
-    def _getPlayerStats(self, player: str) -> TypePlayerData:
-        ret: dict = self.playerData.get(player, dict())
+    def _getPlayerStats(self, playerID: int) -> TypePlayerData:
+        ret: dict = self.playerData.get(str(playerID), dict())
 
         if not ret:
-            ret[PersistentStats.ITEM_ID] = -1
-            ret[PersistentStats.ITEM_DATA][PersistentStats.DATA_ITEM_BINGOS] = 0
-            ret[PersistentStats.ITEM_DATA][PersistentStats.DATA_ITEM_CALLS] = 0
-            ret[PersistentStats.ITEM_DATA][PersistentStats.DATA_ITEM_GAMES] = 0
+            ret[PersistentStats.ITEM_NAME] = ""
+            ret.update(PlayerOrdinal(-1).stats)
 
         return ret
 

@@ -52,7 +52,7 @@ class TaskProcessor:
     __LOGGER = ClassLogger(__name__)
 
     def __init__(self, loop: asyncio.AbstractEventLoop):
-        self.botAsyncLoop = loop
+        self.loop = loop
         self.processorThread = threading.Thread(target=self._threadEntry)
         self.running = False
         self.taskQueue: Queue[TaskUpdateUserDMs] = Queue()
@@ -88,12 +88,12 @@ class TaskProcessor:
         #           task at a time, in sequence. This will allow other bot async tasks to be "injected"
         #           into the event queue as interactions happen. This will allow the bot to still be
         #           responsive to the UI
-        asyncio.set_event_loop(self.botAsyncLoop)
+        asyncio.set_event_loop(self.loop)
         while self.running:
             task  = self.taskQueue.get() # Wait for a task to become available
             if self.running:
                 TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Executing task: {task}")
-                future = asyncio.run_coroutine_threadsafe(task.execTask(), self.botAsyncLoop)
+                future = asyncio.run_coroutine_threadsafe(task.execTask(), self.loop)
                 future.result(timeout=5.0)
 
         TaskProcessor.__LOGGER.log(LogLevel.LEVEL_INFO, "Task processor thread ended.")

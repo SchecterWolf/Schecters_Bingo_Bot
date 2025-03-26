@@ -6,12 +6,14 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "__"
 
+import aiohttp
 import discord
 import sys
 
 from .IAsyncDiscordGame import IAsyncDiscordGame
 
 from config.ClassLogger import ClassLogger
+from config.Globals import GLOBALVARS
 from config.Log import LogLevel
 
 from discord.app_commands.commands import Command
@@ -19,16 +21,16 @@ from discord.app_commands.commands import Command
 from game.ActionData import ActionData
 from game.GameStore import GameStore
 
+from PIL import Image
+from io import BytesIO
 from typing import cast
-
 from unittest.mock import AsyncMock, MagicMock
 
 class DebugCommandHandler:
     __LOGGER = ClassLogger(__name__)
 
-    def __init__(self , bot: discord.Client):
-        self.bot = bot
-        self.tree = discord.app_commands.CommandTree(self.bot)
+    def __init__(self, bot: discord.Client):
+        self.tree = discord.app_commands.CommandTree(bot)
 
         self.listCommands: list[Command] = [
             Command(
@@ -40,6 +42,11 @@ class DebugCommandHandler:
                 name="bulk_add_players",
                 description="Adds many ephemeral users (30)",
                 callback=self.bulkAddPlayers
+            ),
+            Command(
+                name="save_avatar",
+                description="Saves the users avatar internally",
+                callback=self.saveAvatar
             )
         ]
 
@@ -56,6 +63,20 @@ class DebugCommandHandler:
         except Exception as e:
             DebugCommandHandler.__LOGGER.log(LogLevel.LEVEL_CRIT, f"Failed to sync commands: {e}")
             sys.exit(1)
+
+    async def saveAvatar(self, interaction: discord.Interaction):
+        if not interaction.user:
+            await interaction.response.send_message("Command didnt include user", ephemeral=True)
+            return
+        await interaction.response.send_message("Request processing", ephemeral=True)
+        DebugCommandHandler.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Saving avatar for user \"{interaction.user.display_name}\"({interaction.user.id})")
+
+        user = interaction.user
+        async with aiohttp.ClientSession() as session:
+            async with session.get(user.display_avatar.url) as response:
+                imageData = await response.read()
+                image = Image.open(BytesIO(imageData))
+                image.save(f"{GLOBALVARS.PROJ_ROOT}/SavedUserAvatar.png")
 
     async def bulkAddPlayers(self, interaction: discord.Interaction):
         DebugCommandHandler.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Slash command bulkAddPlayers called")

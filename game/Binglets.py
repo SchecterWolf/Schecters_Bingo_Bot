@@ -10,9 +10,9 @@ import copy
 import json
 
 from .Bing import Bing
-from config.ClassLogger import ClassLogger
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Globals import GLOBALVARS
-from config.Log import LogLevel
+from pathlib import Path
 from typing import Dict, List
 
 class Binglets:
@@ -25,6 +25,9 @@ class Binglets:
         if not cls.__instance:
             cls.__instance = super().__new__(cls, *args, **kwargs)
         return cls.__instance
+
+    def __init__(self):
+        self.bingletsFile = Path(GLOBALVARS.FILE_CONFIG_BINGLETS)
 
     def getBingletsCopy(self) -> List[Bing]:
         if not Binglets.__bings_ary:
@@ -56,9 +59,12 @@ class Binglets:
 
     def _loadBings(self):
         Binglets.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Reading in binglets config.")
-        # TODO SCH Use Path from pathlib to check if exists (print crit error and sys exit), See ServerGlobalStats
-        with open(GLOBALVARS.FILE_CONFIG_BINGLETS, 'r') as file:
-            config = json.load(file)
+        if not self.bingletsFile.exists():
+            return
+        else:
+            with self.bingletsFile.open("r") as file:
+                config = json.load(file)
+
         i = 1 # Note: 0 is reserved for FREE SPACE
         for key, array in config['bings'].items():
             _bings: List[Bing] = []

@@ -1,4 +1,7 @@
 {
+    "BonusBingo": 20,
+    "BonusGamesPlayed": 5,
+    "BonusSlotsCalled": 1,
     "CardSize": 5,
     "Debug": true,
     "DiscordLink": "https://discord.gg/YjdDtT8q",
