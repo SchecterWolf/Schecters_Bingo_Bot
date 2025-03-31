@@ -48,7 +48,7 @@ class IChannelInterface(ABC):
 
     async def sendNotice(self, notice: str):
         await self._deleteChannelItem(IChannelInterface.__MSG_NOTICE)
-        await self._updateChannelItem(IChannelInterface.__MSG_NOTICE, content=f"NOTICE: {notice}")
+        await self.sendNoticeItem(content=f"NOTICE: {notice}")
 
     async def sendNoticeItem(self, **kwargs):
         await self._deleteChannelItem(IChannelInterface.__MSG_NOTICE)
@@ -70,18 +70,12 @@ class IChannelInterface(ABC):
         self._messageIDs.clear()
 
     async def _updateChannelItem(self, idString: str, **kwargs):
-        ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, f"_updateChannelItem called: {kwargs}") # TODO SCH rm
         messageID = self._messageIDs.get(idString, IChannelInterface.__INVALID_ID)
         if messageID == IChannelInterface.__INVALID_ID:
             message = await self._channel.send(**kwargs)
             self._messageIDs[idString] = message.id
         else:
-            try:
-                message = await self._channel.fetch_message(messageID)
-            except Exception as e:
-                print(f">>>>>>> caught exception: {e}")
-                sys.exit(1)
-            ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, f"editing channel message: {message.id}") # TODO SCH rm
+            message = await self._channel.fetch_message(messageID)
             await message.edit(**kwargs)
 
     async def _deleteChannelItem(self, idString: str):

@@ -77,6 +77,9 @@ class TaskProcessor:
     def addTask(self, task: TaskUpdateUserDMs):
         if self.running:
             TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Adding new task to processor queue: {task}")
+            # TODO SCH Check if the player already has a task in queue. If they do, skip adding
+            #           A new task, since the update will handle any new changes after the initial
+            #           task was added
             self.taskQueue.put(task)
 
     def _threadEntry(self):

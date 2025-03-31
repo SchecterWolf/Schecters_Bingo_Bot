@@ -60,26 +60,30 @@ class GameControllerDiscord(IGameController):
             newGame = None
         else:
             newGame = cast(IAsyncDiscordGame, GameInterfaceDiscord(self.bot, gameGuild))
+            ret.result = True
 
+        # Go ahead an add the game to the store since the startup procedure needs it
+        if ret.result and newGame:
+            GameStore().addGame(guild.id, newGame)
+
+        # Init and start the game
         GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "calling newGame.initGame") # TODO SCH rm
         if newGame and isinstance(newGame, IAsyncDiscordGame):
-            # Init and start the game
             if not (await newGame.init()).result:
                 ret.responseMsg = "Failed to initialize game. Aborting."
             else:
                 GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "calling newGame.startGame") # TODO SCH rm
                 ret = await newGame.start()
 
-            # Add the game if all goes well
-            if ret.result:
-                GameStore().addGame(guild.id, newGame)
-            # Remove the game on error
-            else:
-                GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "calling newGame.destroyGame") # TODO SCH rm
-                await newGame.destroy()
-
-        # Send error message, if any
+        # Teardown on error
         if not ret.result:
+            # Remove the game from the store
+            GameStore().removeGame(guild.id)
+            # Destroy the new game
+            if newGame:
+                GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_CRIT, "Destroying problematic game.")
+                newGame.destroy()
+            # Send error message
             await interaction.response.send_message(ret.responseMsg, ephemeral=True)
 
         GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_INFO if ret.result else LogLevel.LEVEL_ERROR, ret.responseMsg)

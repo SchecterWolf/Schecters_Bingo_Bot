@@ -20,6 +20,7 @@ class GLOBALVARS:
     FILE_GAME_DATA = DIR_DATA + "/game.json"
     FILE_PLAYER_DATA = DIR_DATA + "/players.json"
 
+    IMAGE_BINGO_ICON = DIR_RESOURCES + "/assets/BingoIcon.png"
     IMAGE_CALL_ICON = DIR_RESOURCES + "/assets/CallIcon.png"
     IMAGE_CARD_BG = DIR_RESOURCES + "/assets/CardBG.jpg"
     IMAGE_GLOBAL_BOARD = DIR_RESOURCES + "/assets/GameGlobalBoard.png"

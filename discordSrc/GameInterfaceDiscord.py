@@ -188,15 +188,20 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
             player = cast(Player, ret.additional)
 
             if user.dm_channel:
-                GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Creating UserDMChannel for user {user.display_name}") # TODO SCH rm
                 dmChannel = UserDMChannel(self.gameGuild.guildID, user.dm_channel, player)
             else:
-                GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Creating MockUserDMChannel for user {user.display_name}") # TODO SCH rm
                 mockChannel: discord.DMChannel = data.get("mockDMChannel")
                 dmChannel = MockUserDMChannel(mockChannel, player)
 
             player.ctx = dmChannel
             await dmChannel.setViewStarted()
+
+        # Update the bingo channel game status embed
+        # Note: The 'refresh' attr is not normally used except for the bulk add debug command,
+        #       which sets it to false so the bingo channel isn't spammed
+        refresh = data.get("refresh") if data.has("refresh") else True
+        if ret.result and refresh:
+            await self.channelBingo.refreshGameStatus()
 
         if ret.result and self.YTiface:
             self.YTiface.addPlayer(data)

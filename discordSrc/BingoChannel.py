@@ -39,7 +39,7 @@ class BingoChannel(IChannelInterface):
     async def setViewStarted(self):
         await self._purgeChannel()
         await self._updateChannelItem(BingoChannel.__MSG_GLOBAL_STATS, file=await self._getLeaderBoardFile())
-        await self.refreshGameStatus()
+        await self._updateChannelItem(BingoChannel.__MSG_GAME_STATUS, embed=self.gameStatus, file=self.gameStatus.file)
         await self._updateChannelItem(BingoChannel.__MSG_ADD_PLAYER, content=self.addPlayer.msgStr, view=self.addPlayer)
 
     @verifyView(ChannelView.PAUSED)
@@ -59,6 +59,12 @@ class BingoChannel(IChannelInterface):
     async def refreshGameStatus(self):
         self.gameStatus.refreshStats()
         await self._updateChannelItem(BingoChannel.__MSG_GAME_STATUS, embed=self.gameStatus)
+
+    # We need to make sure the add player button is always last in the bingo channel
+    async def sendNoticeItem(self, **kwargs):
+        await self._deleteChannelItem(BingoChannel.__MSG_ADD_PLAYER)
+        kwargs['view'] = self.addPlayer
+        await super().sendNoticeItem(**kwargs)
 
     async def _getLeaderBoardFile(self, forceRefresh: bool = False) -> discord.File:
         if not self.fileLeaderBoard or forceRefresh:

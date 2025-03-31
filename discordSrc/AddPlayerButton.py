@@ -28,7 +28,7 @@ class AddPlayerButton(View, IContentItem):
 
     def __init__(self, gameID: int):
         View.__init__(self, timeout=None)
-        IContentItem.__init__(self, "Add player")
+        IContentItem.__init__(self, "Join the game!")
 
         self.gameID = gameID
         self.confirmMsgID = -1
