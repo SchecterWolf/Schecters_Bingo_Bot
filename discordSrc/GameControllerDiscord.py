@@ -6,7 +6,6 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
-import asyncio
 import discord
 
 from .GameGuild import GameGuild
@@ -26,10 +25,13 @@ from typing import Dict, cast
 class GameControllerDiscord(IGameController):
     __LOGGER = ClassLogger(__name__)
 
-    def __init__(self, gameGuilds: Dict[int, GameGuild], loop: asyncio.AbstractEventLoop):
+    def __init__(self, bot: discord.Client, gameGuilds: Dict[int, GameGuild]):
+        self.bot = bot
         self.gameGuilds = gameGuilds
         self.gameStore = GameStore()
-        self.botAsyncLoop = loop
+
+    def getBotClient(self) -> discord.Client:
+        return self.bot
 
     def startGame(self, *args, **kwargs):
         GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"startGame called") # TODO SCH rm
@@ -57,7 +59,7 @@ class GameControllerDiscord(IGameController):
             ret.responseMsg = f"Discord server id \"{guild.id}\" already has a game in progress, skipping."
             newGame = None
         else:
-            newGame = cast(IAsyncDiscordGame, GameInterfaceDiscord(gameGuild, self.botAsyncLoop))
+            newGame = cast(IAsyncDiscordGame, GameInterfaceDiscord(self.bot, gameGuild))
 
         GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "calling newGame.initGame") # TODO SCH rm
         if newGame and isinstance(newGame, IAsyncDiscordGame):

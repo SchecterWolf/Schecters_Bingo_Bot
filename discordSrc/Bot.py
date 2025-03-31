@@ -12,7 +12,7 @@ import logging # TODO SCH rm
 from .DebugCommandHandler import DebugCommandHandler
 from .GameControllerDiscord import GameControllerDiscord
 from .GameGuild import GameGuild
-from .ServerGlobalStats import ServerGlobalStats
+from .LeaderboardCreator import LeaderboardCreator
 from .StartGameButton import StartGameButton
 
 from config.ClassLogger import ClassLogger
@@ -31,6 +31,12 @@ from typing import Union
 class Bot(Client):
     __LOGGER = ClassLogger(__name__)
     __STARTUP_MSG = "Schecter's Bingo Bot started!"
+    __instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls.__instance:
+            cls.__instance = super().__new__(cls, *args, **kwargs)
+        return cls.__instance
 
     def __init__(self):
         intents = discord.Intents.default()
@@ -72,7 +78,7 @@ class Bot(Client):
         for guild in self.guilds:
             await self.on_guild_join(guild)
 
-        GameStore().addController(GameControllerDiscord(self.gameGuilds, self.loop))
+        GameStore().addController(GameControllerDiscord(self, self.gameGuilds))
 
     async def on_guild_join(self, guild: discord.Guild):
         """
@@ -87,7 +93,7 @@ class Bot(Client):
             channelBingo = discord.utils.get(guild.text_channels, name=GLOBALVARS.CHANNEL_BINGO)
             if channelBingo:
                 await channelBingo.purge()
-                await channelBingo.send(Bot.__STARTUP_MSG, embed=ServerGlobalStats(persistentStats))
+                await channelBingo.send(Bot.__STARTUP_MSG, file=await LeaderboardCreator(self, persistentStats).createAsset())
         except Exception as e:
             self.__LOGGER.log(LogLevel.LEVEL_CRIT, f"Could not set up bingo channel for guild {guild.id}: {e}")
             return

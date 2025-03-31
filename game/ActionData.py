@@ -4,7 +4,7 @@ __credits__ = ["Schecter Wolf"]
 __license__ = "GPLv3"
 __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
-__email__ = "schecterwolfe@gmail.com"
+__email__ = "--"
 
 import sys
 

@@ -6,7 +6,6 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
-import asyncio
 import discord
 
 from .AdminChannel import AdminChannel
@@ -38,10 +37,11 @@ from youtube.GameInterfaceYoutube import GameInterfaceYoutube
 class GameInterfaceDiscord(IAsyncDiscordGame):
     __LOGGER = ClassLogger(__name__)
 
-    def __init__(self, gameGuild: GameGuild, loop: asyncio.AbstractEventLoop):
+    def __init__(self, bot: discord.Client, gameGuild: GameGuild):
         super().__init__(gameGuild)
+        self.bot = bot
         self.initialized = False
-        self.taskProcessor = TaskProcessor(loop)
+        self.taskProcessor = TaskProcessor(self.bot.loop)
 
         if Config().getConfig("YTChannelID") and False: # TODO SCH comment back in once im done testing the refactor
             self.YTiface = GameInterfaceYoutube()
@@ -68,7 +68,7 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         # Bingo view init
         if ret.result:
             GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Creating BingoChannel.") # TODO SCH
-            self.channelBingo = BingoChannel(self.gameGuild)
+            self.channelBingo = BingoChannel(self.bot, self.gameGuild)
 
         # Admin view init
         if ret.result:
@@ -306,10 +306,9 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         return ret
 
     async def _crankStateViews(self) -> Result:
-        GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Cranking state views...")
-
         ret = Result(True)
         gameState = self.game.getGameState().additional
+        GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Cranking state views to ({gameState})...")
 
         # Init the views to the new game state
         if gameState == GameState.IDLE and self.viewState == GameState.IDLE:

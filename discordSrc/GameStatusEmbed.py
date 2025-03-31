@@ -17,8 +17,7 @@ from game.Player import Player
 from typing import Deque, List, Tuple
 
 # TODO SCH rm
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 
 class GameStatusEmbed(Embed, IStatusInterface):
     __DISCORD_MAX_INLINE = 3
@@ -42,6 +41,7 @@ class GameStatusEmbed(Embed, IStatusInterface):
         self.refreshStats()
 
     def refreshStats(self):
+        ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, "Refreshing game stats")
         self.clear_fields()
         self._refreshBingos()
         self._refreshCalls()
