@@ -26,3 +26,7 @@ class ActionData:
             sys.exit(1)
 
         return self.__getattribute__(attr)
+
+    def has(self, attr: str) -> bool:
+        return hasattr(self, attr)
+

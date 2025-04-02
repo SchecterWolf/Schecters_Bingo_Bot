@@ -16,7 +16,8 @@ from game.Player import Player
 from typing import List
 
 class CallNoticeEmbed(Embed):
-    __FIELD_MARKED_TITLE = "Player Cards Marked"
+    __FIELD_MARKED_TITLE = "\U0001F4DD Player Cards Marked"
+    __FIELD_MARKED_COL = "\U0001F464"
     __MAX_ROW_COUNT = 8
 
     def __init__(self, calledBing: Bing, markedPlayers: List[Player], newBingos: str):
@@ -26,20 +27,26 @@ class CallNoticeEmbed(Embed):
 
         self.color = discord.Color.red()
         self.set_author(name="Bingo slot called", icon_url=f"attachment://{_iconName}")
-        self.title = f"[{calledBing.bingStr}]"
+        self.title = f"\u200b\n\U00002757 {calledBing.bingStr} \U00002757\n\u200b"
 
         # Add the new bingo players, if any
         if newBingos:
-            self.add_field(name="BINGOS!", value=newBingos, inline=False)
+            self.add_field(name="\U0001F3C5 BINGOS \U0001F3C5", value=newBingos, inline=False)
+            self._addFieldSeparator()
 
         # Add the marked players
+        if markedPlayers:
+            self.add_field(name=CallNoticeEmbed.__FIELD_MARKED_TITLE, value="\u00A0", inline=False)
         curList: List[str] = []
         for i, player in enumerate(markedPlayers):
             if i and i % CallNoticeEmbed.__MAX_ROW_COUNT == 0:
-                self.add_field(name=CallNoticeEmbed.__FIELD_MARKED_TITLE, value="\n".join(curList), inline=True)
+                self.add_field(name=CallNoticeEmbed.__FIELD_MARKED_COL, value="\n".join(curList), inline=True)
                 curList.clear()
             else:
                 curList.append(player.card.getCardOwner())
         if curList:
-            self.add_field(name=CallNoticeEmbed.__FIELD_MARKED_TITLE, value="\n".join(curList), inline=True)
+            self.add_field(name=CallNoticeEmbed.__FIELD_MARKED_COL, value="\n".join(curList), inline=True)
+
+    def _addFieldSeparator(self):
+        self.add_field(name="\u200b", value="\u200b", inline=False)
 

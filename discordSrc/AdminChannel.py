@@ -100,7 +100,7 @@ class AdminChannel(IChannelInterface):
             await self._deleteChannelItem(req.viewID)
 
     async def _addAllRequestViews(self):
-        ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, "Adding all requestviews")
+        ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, "Adding all request views")
         for req in self.requestsViews:
             await self._updateChannelItem(req.viewID, content=req.viewText, view=req)
 

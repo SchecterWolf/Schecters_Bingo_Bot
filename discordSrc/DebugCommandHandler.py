@@ -91,9 +91,12 @@ class DebugCommandHandler:
             await interaction.response.send_message(f"There is no active game for {guildName}, cannot add player!")
         else:
             await interaction.response.send_message("Added bulk players to the game!")
+
+            game = cast(IAsyncDiscordGame, game)
             for player in mockPlayers:
                 mockInter = self._makeMockInteraction(interaction)
-                self._addPlayerIntrnl(cast(IAsyncDiscordGame, game), mockInter, player)
+                self._addPlayerIntrnl(game, mockInter, player, False)
+            self._addPlayerIntrnl(game, self._makeMockInteraction(interaction), "Pikachu", True)
 
     async def addPlayer(self, interaction: discord.Interaction, message: str):
         DebugCommandHandler.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Slash command addPlayer called with guild id: {interaction.guild_id}.")
@@ -102,7 +105,7 @@ class DebugCommandHandler:
         # Add mock player to the game
         if game:
             await interaction.response.send_message(f"Mock user \"{message}\" as been added to the game.")
-            self._addPlayerIntrnl(cast(IAsyncDiscordGame, game), interaction, message)
+            self._addPlayerIntrnl(cast(IAsyncDiscordGame, game), interaction, message, True)
         else:
             guildName = interaction.guild.name if interaction.guild else "the guild"
             await interaction.response.send_message(f"There is no active game for {guildName}, cannot add player!")
@@ -133,7 +136,7 @@ class DebugCommandHandler:
 
         return mockInter
 
-    def _addPlayerIntrnl(self, game: IAsyncDiscordGame, interaction: discord.Interaction, player: str):
+    def _addPlayerIntrnl(self, game: IAsyncDiscordGame, interaction: discord.Interaction, player: str, refresh: bool):
         # Create the mock user
         mockUser = MagicMock(spec=discord.User)
         mockUser.id = -1
@@ -152,5 +155,5 @@ class DebugCommandHandler:
 
         # Add mock player to the running game
         interaction.user = mockUser
-        _ = game.addPlayer(ActionData(interaction=interaction, mockDMChannel=mockChannel))
+        _ = game.addPlayer(ActionData(interaction=interaction, mockDMChannel=mockChannel, refresh=refresh))
 

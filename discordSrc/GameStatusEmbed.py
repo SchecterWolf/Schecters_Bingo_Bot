@@ -7,72 +7,125 @@ __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
 import discord
-import math
+import os
+import textwrap
+
+from .IAsyncDiscordGame import IAsyncDiscordGame
 
 from discord import Embed
-from game.Binglets import Binglets
-from game.GameStore import GameStore
-from game.IStatusInterface import IStatusInterface
-from game.Player import Player
-from typing import Deque, List, Tuple
-
-# TODO SCH rm
 from config.ClassLogger import ClassLogger, LogLevel
+from config.Config import GLOBALVARS
+from game.GameStore import GameStore
+from game.IGameInterface import IGameInterface
+from game.PersistentStats import PlayerOrdinal, PersistentStats
+from typing import Deque, List, cast
 
-class GameStatusEmbed(Embed, IStatusInterface):
-    __DISCORD_MAX_INLINE = 3
-    __FIELD_BINGO = "Player Bingos"
-    __FIELD_CALLS = "Slots Called"
-    __ICON_URL = "https://cdn-icons-png.freepik.com/256/3239/3239007.png" # TODO SCH Get an actual icon file
+class GameStatusEmbed(Embed):
+    __LOGGER = ClassLogger(__name__)
+    __STATS_EMBED_AUTHOR = "Active Livestream Bingo: FiveM" # TODO SCH 'FiveM' will need to be configurable
+    __ORDINALS = ["1st", "2nd", "3rd"]
+    __ORDINAL_EMOJI = ["\U0001F947", "\U0001F948", "\U0001F949"]
+    __INLINE_SPACER = "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"
+    __INLINE_SPACER_BIGGER = f"{__INLINE_SPACER}{__INLINE_SPACER}"
+
+    __FIELD_CALLS = "\U0001F5E3 Slots Called"
+    __FIELD_PLAYERS = "\U0001F465 Active Players"
+    __FIELD_TOP_PLAYERS = "Current Top Players"
+
     __LENGTH_MAX_CALLS = 25
-    __STATS_EMBED_AUTHOR = "Livestream Bingo Info"
-    __STATS_EMBED_TITLE = "Current bingo game: FiveM"
     __WIDTH_MAX_BINGOS = 75
 
     def __init__(self, gameID: int):
-        Embed.__init__(self)
-        IStatusInterface.__init__(self)
+        super().__init__()
 
+        _iconName = os.path.basename(GLOBALVARS.IMAGE_BINGO_ICON)
+        self.file = discord.File(GLOBALVARS.IMAGE_BINGO_ICON, filename=_iconName)
         self.gameID = gameID
-        self.set_author(name=GameStatusEmbed.__STATS_EMBED_AUTHOR, icon_url=GameStatusEmbed.__ICON_URL)
+
+        # Embed members
+        self.set_author(name=GameStatusEmbed.__STATS_EMBED_AUTHOR, icon_url=f"attachment://{_iconName}")
         self.color = discord.Color.blue()
-        self.title = GameStatusEmbed.__STATS_EMBED_TITLE
 
         self.refreshStats()
 
     def refreshStats(self):
-        ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, "Refreshing game stats")
+        GameStatusEmbed.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Refreshing active game stats embed.")
         self.clear_fields()
-        self._refreshBingos()
-        self._refreshCalls()
-        self._refreshHighestSlotsPlayer()
 
-    def _refreshBingos(self):
         game = GameStore().getGame(self.gameID)
-        if not game:
-            return
+        if game:
+            self._refreshTopPlayers(game)
+            self._refreshPlayers(game)
+            self._refreshCalls(game)
 
-        playerBingoStrs = game.game.getPlayerBingos()
-        playerBingos: List[str] = [""] if playerBingoStrs else ["[NONE]"]
-        for playerStr in playerBingoStrs:
-            playerBingosLine = playerBingos[-1]
-            prefix = ""
-            if playerBingosLine:
-                prefix = ", "
+    def _refreshTopPlayers(self, game: IGameInterface):
+        iface = cast(IAsyncDiscordGame, game)
 
-            if len(playerBingosLine) + len(prefix + playerStr) > GameStatusEmbed.__WIDTH_MAX_BINGOS:
-                playerBingos.append(playerStr)
-            else:
-                playerBingos[-1] += prefix + playerStr
+        players = iface.game.getAllPlayers()
+        topPlayers: Deque[PlayerOrdinal] = Deque()
 
-        self.add_field(name=GameStatusEmbed.__FIELD_BINGO, value="\n".join(playerBingos), inline=False)
-        self._addFieldSeparator(self)
+        bingoBonus = iface.gameGuild.persistentStats.getBonus(PersistentStats.DATA_ITEM_BINGOS)
+        callBonus = iface.gameGuild.persistentStats.getBonus(PersistentStats.DATA_ITEM_CALLS)
 
-    def _refreshCalls(self):
-        game = GameStore().getGame(self.gameID)
-        if not game:
-            return
+        # Top player title
+        self.add_field(name=GameStatusEmbed.__FIELD_TOP_PLAYERS, value="\u00A0", inline=False)
 
+        # Calculate top session players
+        for player in players:
+            pl = PlayerOrdinal(-1, player.card.getCardOwner())
+            bingo = 1 if player.card.hasBingo() else 0
+            slots = player.card.getNumMarked()
+            points = (bingo * bingoBonus) + (slots * callBonus)
+            pl.stats[PersistentStats.ITEM_TOTAL][PersistentStats.DATA_ITEM_BINGOS] = bingo
+            pl.stats[PersistentStats.ITEM_TOTAL][PersistentStats.DATA_ITEM_CALLS] = slots
+            pl.points[PersistentStats.ITEM_TOTAL] = points
+
+            if points:
+                idx = 0
+                for index, qStat in enumerate(topPlayers):
+                    if points > qStat.points[PersistentStats.ITEM_TOTAL]:
+                        break
+                    idx = index + 1
+                topPlayers.insert(idx, pl)
+                if len(topPlayers) > 3:
+                    topPlayers.pop()
+
+        for index, player in enumerate(topPlayers):
+            bingos = player.stats[PersistentStats.ITEM_TOTAL][PersistentStats.DATA_ITEM_BINGOS]
+            slots = player.stats[PersistentStats.ITEM_TOTAL][PersistentStats.DATA_ITEM_CALLS]
+            val=f"\
+__**{player.name}**__\n\
+Bingos {bingos}\n\
+{GameStatusEmbed.__INLINE_SPACER_BIGGER}{bingos * bingoBonus} Pts\n\
+Slots Marked {slots}{GameStatusEmbed.__INLINE_SPACER}\n\
+{GameStatusEmbed.__INLINE_SPACER_BIGGER}{slots * callBonus} Pts\n\
+**{player.points[PersistentStats.ITEM_TOTAL]} Pts Total**"
+            self.add_field(name=f"{GameStatusEmbed.__ORDINAL_EMOJI[index]} {GameStatusEmbed.__ORDINALS[index]} Player",
+                           value=val, inline=True)
+
+
+        # Pad out empty fields so we can get a new row for the next line item (Bingos)
+        offset = len(topPlayers) if topPlayers else 0
+        pad = 3 - len(topPlayers)
+        for i in range(pad):
+            self.add_field(name=f"{GameStatusEmbed.__ORDINAL_EMOJI[i + offset]} {GameStatusEmbed.__ORDINALS[i + offset]}", value="N/A", inline=True)
+
+        self._addFieldSeparator()
+
+    def _refreshPlayers(self, game: IGameInterface):
+        allPlayers = game.game.getAllPlayers()
+        players = "" if allPlayers else "[NONE]"
+
+        for player in allPlayers:
+            if players:
+                players += ", "
+            players += player.card.getCardOwner()
+
+        players = textwrap.fill(players, width=GameStatusEmbed.__WIDTH_MAX_BINGOS)
+        self.add_field(name=f"{GameStatusEmbed.__FIELD_PLAYERS} ({len(allPlayers)})", value=players, inline=False)
+        self._addFieldSeparator()
+
+    def _refreshCalls(self, game: IGameInterface):
         calledStrs: List[List[str]] = [[]]
         for slot in game.game.getCalls():
             calledRow = calledStrs[-1]
@@ -87,36 +140,6 @@ class GameStatusEmbed(Embed, IStatusInterface):
             for row in calledStrs:
                 self.add_field(name=GameStatusEmbed.__FIELD_CALLS, value="\n".join(row), inline=True)
 
-            # Pad out empty fields so we can get a new row for the next line item (most player calls)
-            pad = math.ceil(Binglets().getNumBings() / GameStatusEmbed.__LENGTH_MAX_CALLS)
-            for i in range(pad - len(calledStrs) % GameStatusEmbed.__DISCORD_MAX_INLINE):
-                self.add_field(name=GameStatusEmbed.__FIELD_CALLS, value="-----------", inline=True)
-
-            self._addFieldSeparator(self)
-
-    def _refreshHighestSlotsPlayer(self):
-        game = GameStore().getGame(self.gameID)
-        if not game:
-            return
-
-        topPlayers: Deque[Tuple[Player, int]] = Deque()
-        for player in game.game.getAllPlayers():
-            if not topPlayers:
-                topPlayers.appendleft((player, player.card.getNumMarked()))
-                continue
-
-            num = player.card.getNumMarked()
-            idx = 0
-            for index, qStat in enumerate(topPlayers):
-                idx = index
-                if num >= qStat[1]:
-                    break
-            topPlayers.insert(idx, (player, num))
-
-            if len(topPlayers) > 3:
-                topPlayers.pop()
-
-        ords = IStatusInterface.ORDINALS.copy()
-        for player, num in topPlayers:
-            self.add_field(name=f"{ords.pop()} place slot count", value=f"{player.card.getCardOwner()} [{num}]")
+    def _addFieldSeparator(self):
+        self.add_field(name="\u200b", value="\u200b", inline=False)
 

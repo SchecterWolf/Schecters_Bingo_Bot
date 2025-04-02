@@ -10,6 +10,7 @@ import asyncio
 
 from .UserDMChannel import UserDMChannel
 
+from config.ClassLogger import ClassLogger, LogLevel
 from discord.channel import DMChannel
 from game.Player import Player
 
@@ -22,6 +23,7 @@ class MockUserDMChannel(UserDMChannel):
     """
     def __init__(self, channel: DMChannel, player: Player):
         super().__init__(-1, channel, player)
+        ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, f"MockUserDMChannel created for user {player.card.getCardOwner()}")
 
     async def removeNotice(self):
         pass
