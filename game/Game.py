@@ -185,7 +185,6 @@ class Game:
         return ret
 
     def removePlayer(self, playerName: str) -> Result:
-        # TODO SCH
         return Result(False)
 
     def makeCall(self, index: int) -> Result:

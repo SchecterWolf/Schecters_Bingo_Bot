@@ -32,9 +32,6 @@ class GameControls(View, IContentItem):
         self.resumeButton = ResumeGameButton(gameID)
         self.endGameButton = EndGameButton()
 
-        # TODO SCH add kick and ban player buttons
-        # These buttons should pop up a modal with a select menu of active players
-
     def setControllsState(self, state: GameControlState):
         # Clear all items in the view
         self.clear_items()

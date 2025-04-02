@@ -151,7 +151,6 @@ class PersistentStats():
                     or (cType == PersistentStats.ITEM_WEEK and currentWeekID > savedWeekID):
                     stats = cast(TypeDataStat, self._getPlayerStats(-1)[cType])
                 self._processStats(player, cType, stats)
-        print(",".join(f"{st.name}({st.points['total']})" for st in self.topPlayers["total"])) # TODO SCH rm
 
     def _processStats(self, player: PlayerOrdinal, cType: str, stats: TypeDataStat):
         for dType in PersistentStats.LIST_DATA_ITEMS:

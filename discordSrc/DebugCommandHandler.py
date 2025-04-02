@@ -8,14 +8,13 @@ __email__ = "__"
 
 import aiohttp
 import discord
-import sys
 
 from .IAsyncDiscordGame import IAsyncDiscordGame
 
-from config.ClassLogger import ClassLogger
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Globals import GLOBALVARS
-from config.Log import LogLevel
 
+from discord.app_commands import AppCommandContext, CommandTree
 from discord.app_commands.commands import Command
 
 from game.ActionData import ActionData
@@ -29,40 +28,32 @@ from unittest.mock import AsyncMock, MagicMock
 class DebugCommandHandler:
     __LOGGER = ClassLogger(__name__)
 
-    def __init__(self, bot: discord.Client):
-        self.tree = discord.app_commands.CommandTree(bot)
-
+    def __init__(self):
+        appContext = AppCommandContext(guild=True, dm_channel=False, private_channel=False)
         self.listCommands: list[Command] = [
             Command(
                 name="add_player",
                 description="Add an ephemeral user",
-                callback=self.addPlayer
+                callback=self.addPlayer,
+                allowed_contexts=appContext,
             ),
             Command(
                 name="bulk_add_players",
                 description="Adds many ephemeral users (30)",
-                callback=self.bulkAddPlayers
+                callback=self.bulkAddPlayers,
+                allowed_contexts=appContext
             ),
             Command(
                 name="save_avatar",
                 description="Saves the users avatar internally",
-                callback=self.saveAvatar
+                callback=self.saveAvatar,
+                allowed_contexts=appContext
             )
         ]
 
-    def setupCommands(self):
+    def setupCommands(self, tree: CommandTree):
         for cmd in self.listCommands:
-            self.tree.add_command(cmd)
-
-    async def syncCommands(self):
-        # Apparently this only has to be done once to register the commands
-        return
-
-        try:
-            await self.tree.sync()
-        except Exception as e:
-            DebugCommandHandler.__LOGGER.log(LogLevel.LEVEL_CRIT, f"Failed to sync commands: {e}")
-            sys.exit(1)
+            tree.add_command(cmd)
 
     async def saveAvatar(self, interaction: discord.Interaction):
         if not interaction.user:

@@ -6,7 +6,7 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
-import asyncio
+import time
 
 from .UserDMChannel import UserDMChannel
 
@@ -29,21 +29,20 @@ class MockUserDMChannel(UserDMChannel):
         pass
 
     async def setViewNew(self):
-        await asyncio.sleep(0.25)
+        time.sleep(0.25)
 
     async def setViewStarted(self):
-        await asyncio.sleep(0.25)
+        time.sleep(0.25)
 
     async def setViewPaused(self):
-        await asyncio.sleep(0.25)
+        time.sleep(0.25)
 
     async def setViewStopped(self):
-        await asyncio.sleep(0.30)
+        time.sleep(0.30)
 
     async def refreshRequestView(self):
         pass
 
     async def setBoardView(self):
-        # TODO SCH Might want to switch this to regular sleep to emulate async-blocking working
-        await asyncio.sleep(1.9)
+        time.sleep(1.9)
 

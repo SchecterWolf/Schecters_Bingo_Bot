@@ -24,7 +24,7 @@ def sync_aware(fn: T) -> Callable[..., None]:
             loop = asyncio.get_running_loop()
         except Exception as e:
             loop = asyncio.get_event_loop()
-            asyncio.set_event_loop(loop) # TODO SCH do I need this?
+            asyncio.set_event_loop(loop)
         loop.create_task(fn(*args, **kwargs))
     return wrapper
 

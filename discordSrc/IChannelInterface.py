@@ -12,11 +12,6 @@ from enum import Enum
 from functools import wraps
 from typing import Union
 
-# TODO SCH rm
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
-import sys
-
 class ChannelView(Enum):
     INIT = 0
     NEW = 1

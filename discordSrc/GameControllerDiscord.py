@@ -34,7 +34,6 @@ class GameControllerDiscord(IGameController):
         return self.bot
 
     def startGame(self, *args, **kwargs):
-        GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"startGame called") # TODO SCH rm
         self._startGameInternal(*args, **kwargs)
 
     def stopGame(self, *args, **kwargs):
@@ -67,12 +66,10 @@ class GameControllerDiscord(IGameController):
             GameStore().addGame(guild.id, newGame)
 
         # Init and start the game
-        GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "calling newGame.initGame") # TODO SCH rm
         if newGame and isinstance(newGame, IAsyncDiscordGame):
             if not (await newGame.init()).result:
                 ret.responseMsg = "Failed to initialize game. Aborting."
             else:
-                GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "calling newGame.startGame") # TODO SCH rm
                 ret = await newGame.start()
 
         # Teardown on error

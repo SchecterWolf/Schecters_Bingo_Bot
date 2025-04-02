@@ -10,8 +10,7 @@ import discord
 
 from .IContentItem import IContentItem
 
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 from discord.ui import View, Button
 from game.ActionData import ActionData
 from game.GameStore import GameStore
@@ -70,12 +69,8 @@ class AddPlayerButton(View, IContentItem):
             await message.delete()
             self.confirmMsgID = -1
 
-        # Add the player to the game
-        AddPlayerButton.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Calling add player callback...") # TODO SCH rm
-
         game = GameStore().getGame(self.gameID)
         if game:
-            # TODO SCH Check if i even need to assign to an unused var (because of the sync_aware decorator)
             _ = game.addPlayer(ActionData(interaction=interaction, displayName=interaction.user.display_name))
 
     def _getGreeting(self, user: discord.User) -> str:
