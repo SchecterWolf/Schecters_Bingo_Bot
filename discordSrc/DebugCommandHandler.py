@@ -8,14 +8,13 @@ __email__ = "__"
 
 import aiohttp
 import discord
-import sys
 
 from .IAsyncDiscordGame import IAsyncDiscordGame
 
-from config.ClassLogger import ClassLogger
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Globals import GLOBALVARS
-from config.Log import LogLevel
 
+from discord.app_commands import AppCommandContext, CommandTree
 from discord.app_commands.commands import Command
 
 from game.ActionData import ActionData
@@ -28,49 +27,45 @@ from unittest.mock import AsyncMock, MagicMock
 
 class DebugCommandHandler:
     __LOGGER = ClassLogger(__name__)
+    __DEBUG_ID_COUNTER = -1
 
-    def __init__(self, bot: discord.Client):
-        self.tree = discord.app_commands.CommandTree(bot)
-
+    def __init__(self):
+        appContext = AppCommandContext(guild=True, dm_channel=False, private_channel=False)
         self.listCommands: list[Command] = [
             Command(
                 name="add_player",
                 description="Add an ephemeral user",
-                callback=self.addPlayer
+                callback=self.addPlayer,
+                allowed_contexts=appContext,
             ),
             Command(
                 name="bulk_add_players",
                 description="Adds many ephemeral users (30)",
-                callback=self.bulkAddPlayers
+                callback=self.bulkAddPlayers,
+                allowed_contexts=appContext
             ),
             Command(
                 name="save_avatar",
                 description="Saves the users avatar internally",
-                callback=self.saveAvatar
+                callback=self.saveAvatar,
+                allowed_contexts=appContext
             )
         ]
 
-    def setupCommands(self):
+    def setupCommands(self, tree: CommandTree):
         for cmd in self.listCommands:
-            self.tree.add_command(cmd)
-
-    async def syncCommands(self):
-        # Apparently this only has to be done once to register the commands
-        return
-
-        try:
-            await self.tree.sync()
-        except Exception as e:
-            DebugCommandHandler.__LOGGER.log(LogLevel.LEVEL_CRIT, f"Failed to sync commands: {e}")
-            sys.exit(1)
+            tree.add_command(cmd)
 
     async def saveAvatar(self, interaction: discord.Interaction):
-        if not interaction.user:
-            await interaction.response.send_message("Command didnt include user", ephemeral=True)
-            return
-        await interaction.response.send_message("Request processing", ephemeral=True)
         DebugCommandHandler.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Saving avatar for user \"{interaction.user.display_name}\"({interaction.user.id})")
 
+        # Make sure user is included
+        if not interaction.user:
+            await interaction.response.send_message("Command didn't include user", ephemeral=True)
+            return
+        await interaction.response.send_message("Request processing", ephemeral=True)
+
+        # Save the user's avatar
         user = interaction.user
         async with aiohttp.ClientSession() as session:
             async with session.get(user.display_avatar.url) as response:
@@ -82,33 +77,36 @@ class DebugCommandHandler:
         DebugCommandHandler.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Slash command bulkAddPlayers called")
         mockPlayers = ["Elephant", "Tiger", "Whale", "Eagle", "Panda", "Shark", "Leopard", "Kangaroo", "Anaconda", "Penguin",
                        "Giraffe", "Frog", "Fox", "Dragon", "Cobra", "Bison", "Kingfisher", "Squid", "Mandrill", "Okapi", "Axolotl",
-                       "Tasmanian Devil", "Badger", "Dart Frog", "Crab", "Narwal", "Aye-Aye", "Quokka", "Saiga"]
+                       "Tasmanian Devil", "Badger", "Dart Frog", "Crab", "Narwal", "Aye-Aye", "Quokka"]
 
-        # Add mock players to game
+        # Make sure game instance exists
         game = GameStore().getGame(interaction.guild_id or -1)
         if not game:
             guildName = interaction.guild.name if interaction.guild else "the guild"
             await interaction.response.send_message(f"There is no active game for {guildName}, cannot add player!")
-        else:
-            await interaction.response.send_message("Added bulk players to the game!")
+            return
+        await interaction.response.send_message("Added bulk players to the game!")
 
-            game = cast(IAsyncDiscordGame, game)
-            for player in mockPlayers:
-                mockInter = self._makeMockInteraction(interaction)
-                self._addPlayerIntrnl(game, mockInter, player, False)
-            self._addPlayerIntrnl(game, self._makeMockInteraction(interaction), "Pikachu", True)
+        # Add mock players to game
+        game = cast(IAsyncDiscordGame, game)
+        for player in mockPlayers:
+            mockInter = self._makeMockInteraction(interaction)
+            self._addPlayerIntrnl(game, mockInter, player, False)
+        self._addPlayerIntrnl(game, self._makeMockInteraction(interaction), "Pikachu", True)
 
     async def addPlayer(self, interaction: discord.Interaction, message: str):
         DebugCommandHandler.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Slash command addPlayer called with guild id: {interaction.guild_id}.")
-        game = GameStore().getGame(interaction.guild_id or -1)
 
-        # Add mock player to the game
-        if game:
-            await interaction.response.send_message(f"Mock user \"{message}\" as been added to the game.")
-            self._addPlayerIntrnl(cast(IAsyncDiscordGame, game), interaction, message, True)
-        else:
+        # Make sure the game instance exists
+        game = GameStore().getGame(interaction.guild_id or -1)
+        if not game:
             guildName = interaction.guild.name if interaction.guild else "the guild"
             await interaction.response.send_message(f"There is no active game for {guildName}, cannot add player!")
+            return
+
+        # Add mock player to the game
+        await interaction.response.send_message(f"Mock user \"{message}\" as been added to the game.")
+        self._addPlayerIntrnl(cast(IAsyncDiscordGame, game), interaction, message, True)
 
     def _makeMockInteraction(self, interaction: discord.Interaction):
         mockInter = AsyncMock(spec=discord.Interaction)
@@ -139,13 +137,12 @@ class DebugCommandHandler:
     def _addPlayerIntrnl(self, game: IAsyncDiscordGame, interaction: discord.Interaction, player: str, refresh: bool):
         # Create the mock user
         mockUser = MagicMock(spec=discord.User)
-        mockUser.id = -1
+        mockUser.id = DebugCommandHandler.__DEBUG_ID_COUNTER
         mockUser.name = player
         mockUser.bot = False
         mockUser.mention = f"<@{mockUser.id}>"
         mockUser.display_name = player
         mockUser.dm_channel = None
-
 
         # Create a mock DM channel
         mockChannel = AsyncMock(spec=discord.DMChannel)
@@ -156,4 +153,5 @@ class DebugCommandHandler:
         # Add mock player to the running game
         interaction.user = mockUser
         _ = game.addPlayer(ActionData(interaction=interaction, mockDMChannel=mockChannel, refresh=refresh))
+        DebugCommandHandler.__DEBUG_ID_COUNTER -= 1
 

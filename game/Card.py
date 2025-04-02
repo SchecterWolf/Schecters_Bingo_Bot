@@ -13,9 +13,8 @@ import time
 
 from .Bing import Bing
 from .Binglets import Binglets
-from config.ClassLogger import ClassLogger
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
-from config.Log import LogLevel
 from typing import List, Union
 
 class Card:
@@ -159,8 +158,6 @@ class Card:
         return ret
 
     def _adjustCondition(self, bing, rowCount, colCount, diagA, diagB):
-            Card._LOGGER.log(LogLevel.LEVEL_ERROR, f"Adjusting card condition for player {self.playername}") # TODO SCH rm
-            Card._LOGGER.log(LogLevel.LEVEL_ERROR, f"rowCount: {rowCount}, colCount: {colCount}, diagA: {diagA}, diagB: {diagB}") # TODO SCH rm
             self.markedCells[Card.ROW][bing.x] = rowCount
             self.markedCells[Card.COL][bing.y] = colCount
             self.markedCells[Card.DIAG]['A'] = diagA
@@ -170,7 +167,6 @@ class Card:
                           colCount == Card._cardSize or
                           diagA == Card._cardSize or
                           diagB == Card._cardSize)
-            Card._LOGGER.log(LogLevel.LEVEL_ERROR, f"Does {self.playername} have bingo: {self.bingo}") # TODO SCH rm
 
     def _getBingCell(self, index) -> Bing:
         found = Bing("", 0)
@@ -196,7 +192,6 @@ class Card:
 
     def _extractRandomBinglet(self, bings) -> Bing:
         if not hasattr(random, "_initSeed"):
-            Card._LOGGER.log(LogLevel.LEVEL_DEBUG, "Seeding the random module.") # TODO SCH rm
             random.seed(time.time())
             setattr(random, "_initSeed", True)
         randomIdx = random.randrange(0, len(bings))

@@ -9,16 +9,16 @@ __email__ = "--"
 import discord
 import logging # TODO SCH rm
 
+from .AdminCommandHandler import AdminCommandHandler
 from .DebugCommandHandler import DebugCommandHandler
 from .GameControllerDiscord import GameControllerDiscord
 from .GameGuild import GameGuild
 from .LeaderboardCreator import LeaderboardCreator
 from .StartGameButton import StartGameButton
 
-from config.ClassLogger import ClassLogger
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from config.Globals import GLOBALVARS
-from config.Log import LogLevel
 
 from discord.client import Client
 from discord.ui import View
@@ -39,6 +39,10 @@ class Bot(Client):
         return cls.__instance
 
     def __init__(self):
+        # Init guard
+        if hasattr(self, "initialized"):
+            return
+
         intents = discord.Intents.default()
         intents.messages = True
         intents.message_content = True
@@ -48,6 +52,8 @@ class Bot(Client):
 
         self.gameGuilds: dict[int, GameGuild] = {}
         self.debugCommands: Union[None, DebugCommandHandler] = None
+
+        self.initialized = True
 
     def runBot(self) -> bool:
         token = ""
@@ -67,10 +73,21 @@ class Bot(Client):
         await self.close()
 
     async def setup_hook(self):
+        self.adminCommands = AdminCommandHandler()
         if Config().getConfig("Debug"):
-            self.debugCommands = DebugCommandHandler(self)
-            self.debugCommands.setupCommands()
-            await self.debugCommands.syncCommands()
+            self.debugCommands = DebugCommandHandler()
+
+        self.tree = discord.app_commands.CommandTree(self)
+        self.adminCommands.setupCommands(self.tree)
+        if self.debugCommands:
+            self.debugCommands.setupCommands(self.tree)
+        # Apparently this only has to be done once to register the commands
+        if False:
+            try:
+                Bot.__LOGGER.log(LogLevel.LEVEL_CRIT, "Bot commands are syncing...")
+                await self.tree.sync()
+            except Exception as e:
+                Bot.__LOGGER.log(LogLevel.LEVEL_CRIT, f"Failed to sync bot commands: {e}")
 
     # TODO I need to account for the situation if the bot gets disconnected then reconnects
     async def on_ready(self):

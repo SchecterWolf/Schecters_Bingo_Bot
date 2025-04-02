@@ -48,7 +48,7 @@ def MakePlayersBingoNotif(players: List[Player]) -> str:
     return bingosStr
 
 def MakeCallRequestNotif(request: CallRequest) -> str:
-    reqStr = f"Slot \"{request.requestBing.bingStr}\" is requested by {request.players[0].card.getCardOwner()}"
+    reqStr = f"Slot \"{request.requestBing.bingStr}\" is requested by {request.getPrimaryRequester().card.getCardOwner()}"
     if len(request.players) < 2:
         reqStr += "."
     else:

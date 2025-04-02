@@ -46,7 +46,6 @@ class StartGameButton(IGameCtrlBtn):
         await interaction.response.defer()
 
         controller = GameStore().getController()
-        StartGameButton.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"controller: {controller}") # TODO SCH rm
         if not expired and controller:
             _ = controller.startGame(interaction)
 

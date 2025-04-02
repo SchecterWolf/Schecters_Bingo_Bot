@@ -101,14 +101,16 @@ class PersistentStats():
         # Update the internal top players
         self._loadPlayerData()
 
-        # Save the new updated stats
-        with self.filePlayerData.open("w") as file:
-            json.dump(self.playerData, file, indent=4)
-            PersistentStats.__LOGGER.log(LogLevel.LEVEL_INFO, "Player data saved.")
+        # Save player data to file
+        self._save()
 
-        # Save timestamps
-        SavedData().saveData("weekID", str(datetime.date.today().isocalendar()[1]))
-        SavedData().saveData("monthID", str(datetime.date.today().month))
+    def removePlayer(self, playerID: int):
+        ID = str(playerID)
+        if ID in self.playerData:
+            PersistentStats.__LOGGER.log(LogLevel.LEVEL_INFO, f"Player ID {playerID} has been removed from saved player data.")
+            self.playerData.pop(ID, None)
+            self._loadPlayerData()
+            self._save()
 
     def getBonus(self, bType: str) -> int:
         return self.bonuses.get(bType, 0)
@@ -151,7 +153,6 @@ class PersistentStats():
                     or (cType == PersistentStats.ITEM_WEEK and currentWeekID > savedWeekID):
                     stats = cast(TypeDataStat, self._getPlayerStats(-1)[cType])
                 self._processStats(player, cType, stats)
-        print(",".join(f"{st.name}({st.points['total']})" for st in self.topPlayers["total"])) # TODO SCH rm
 
     def _processStats(self, player: PlayerOrdinal, cType: str, stats: TypeDataStat):
         for dType in PersistentStats.LIST_DATA_ITEMS:
@@ -182,4 +183,14 @@ class PersistentStats():
             ret.update(PlayerOrdinal(-1).stats)
 
         return ret
+
+    def _save(self):
+        # Save the new updated stats
+        with self.filePlayerData.open("w") as file:
+            json.dump(self.playerData, file, indent=4)
+            PersistentStats.__LOGGER.log(LogLevel.LEVEL_INFO, "Player data saved.")
+
+        # Save timestamps
+        SavedData().saveData("weekID", str(datetime.date.today().isocalendar()[1]))
+        SavedData().saveData("monthID", str(datetime.date.today().month))
 
