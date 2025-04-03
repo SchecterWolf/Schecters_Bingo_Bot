@@ -46,6 +46,14 @@ class IGameInterface(ABC):
         pass
 
     @abstractmethod
+    def kickPlayer(self, data: ActionData) -> Result:
+        pass
+
+    @abstractmethod
+    def banPlayer(self, data:ActionData) -> Result:
+        pass
+
+    @abstractmethod
     def makeCall(self, data: ActionData) -> Result:
         pass
 

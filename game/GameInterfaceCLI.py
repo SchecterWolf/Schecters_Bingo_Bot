@@ -9,6 +9,7 @@ __email__= "--"
 import argparse
 import textwrap
 
+from .ActionData import ActionData
 from .Binglets import Binglets
 from .CardImgCreator import CardImgCreator
 from .Game import Game
@@ -28,6 +29,7 @@ class GameInterfaceCLI(IGameInterface):
     interactable via stdin
     """
     _logger = ClassLogger(__name__)
+    __player_id_counter = 0
 
     def __init__(self):
         super().__init__(Game())
@@ -42,14 +44,8 @@ class GameInterfaceCLI(IGameInterface):
 
         # Print out global stats
         print("Top Bingos:")
-        for player in stats.topBingos:
-            print(f"\t{player[0]} [{player[1]}]")
-        print("Top Calls:")
-        for player in stats.topCalls:
-            print(f"\t{player[0]} [{player[1]}]")
-        print("Top games:")
-        for player in stats.topGames:
-            print(f"\t{player[0]} [{player[1]}]")
+        for player in stats.topPlayers:
+            print(f"\t{player}")
 
         GameInterfaceCLI._logger.log(LogLevel.LEVEL_DEBUG, "Bingo CLI initialized")
         return bInit
@@ -92,9 +88,16 @@ class GameInterfaceCLI(IGameInterface):
 
         result = Result(False)
         if name:
-            result = self.game.addPlayer(name)
+            result = self.game.addPlayer(name, GameInterfaceCLI.__player_id_counter)
+            GameInterfaceCLI.__player_id_counter += 1
 
         print(result.responseMsg)
+
+    def kickPlayer(self, data: ActionData) -> Result:
+        return self.game.kickPlayer(data.get("playerID"))
+
+    def banPlayer(self, data: ActionData) -> Result:
+        return self.game.banPlayer(data.get("playerID"))
 
     def makeCall(self, command):
         self._logger.log(LogLevel.LEVEL_DEBUG, "MakeCall command called")

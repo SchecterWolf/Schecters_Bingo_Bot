@@ -172,8 +172,6 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         # Verify initialized
         if not self.initialized:
             ret.responseMsg = "Discord interface not initialized, cannot add player."
-        elif isinstance(user, discord.Member):
-            ret.responseMsg = "Invalid interaction user type"
         elif not user.dm_channel and not self.debugMode:
             ret.responseMsg = "Interaction issued with an empty DM channel, cannot add player."
         else:
@@ -211,6 +209,30 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
             if interaction.user.dm_channel:
                 await interaction.user.dm_channel.send(ret.responseMsg)
 
+        return ret
+
+    @sync_aware
+    async def kickPlayer(self, data: ActionData) -> Result:
+        ret = Result(False)
+        user: discord.Member = data.get("member")
+        GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Kicking player {user.display_name} ({user.id})")
+
+        if not self.initialized:
+            ret.responseMsg = "Discord interface not initialized, cannot add player."
+
+        # Kick the player from the game
+        ret = self.game.kickPlayer(user.id)
+
+        # Refresh views
+        if ret.result:
+            await self.channelBingo.refreshGameStatus()
+
+        return ret
+
+    @sync_aware
+    async def banPlayer(self, data: ActionData) -> Result:
+        # Invoke without the sync wrapper since we're internal and do want to block
+        ret = await self.kickPlayer.__wrapped__()
         return ret
 
     @sync_aware
@@ -282,8 +304,9 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
             await self.channelAdmin.addCallRequest(ret.additional)
 
         # Let the player know that their call request was successfull
-        if ret.result and callRequest.players and callRequest.players[0].ctx:
-            await callRequest.players[0].ctx.sendNotice(ret.responseMsg)
+        player = callRequest.getPrimaryRequester()
+        if ret.result and player.ctx:
+            await player.ctx.sendNotice(ret.responseMsg)
 
         # Send notification to livestream
         if ret.result and self.YTiface:

@@ -10,14 +10,15 @@ from .Card import Card
 from typing import Any
 
 class Player:
-    def __init__(self, name: str, userID: int = -1):
+    def __init__(self, name: str, userID: int):
         self.card = Card(name)
         self.userID = userID
         self.ctx: Any = None
+        self.valid = True
 
     def __eq__(self, rhs):
-        return isinstance(rhs, Player) and self.card.getCardOwner() == rhs.card.getCardOwner()
+        return isinstance(rhs, Player) and self.userID == self.userID
 
     def __hash__(self):
-        return hash(self.card.getCardOwner())
+        return hash(self.userID)
 

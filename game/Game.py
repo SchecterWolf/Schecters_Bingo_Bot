@@ -13,8 +13,7 @@ from .PersistentStats import PersistentStats
 from .Player import Player
 from .Result import Result
 
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from enum import Enum
 from typing import List, Set, Union
@@ -44,6 +43,7 @@ class Game:
         self.state: GameState = GameState.NEW
 
         self.calledBings: Set[Bing] = set()
+        self.kickedPlayers: Set[int] = set()
         self.playerBingos: Set[str] = set()
         self.players: Set[Player] = set()
         self.requestedCalls: List[CallRequest] = []
@@ -123,7 +123,7 @@ class Game:
 
         return ret
 
-    def addPlayer(self, playerName: str, userID: int = -1) -> Result:
+    def addPlayer(self, playerName: str, userID: int) -> Result:
         ret = Result(False)
         player = Player(playerName, userID)
         matchedCards = []
@@ -132,6 +132,18 @@ class Game:
         # Check pre-conditions
         if self.state != GameState.STARTED:
             ret.responseMsg = f"New players cannot be added while the game is {self._getStateString()}."
+            Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
+            return ret
+
+        # Make sure the user has a valid player ID
+        if userID < 0 and not Config().getConfig("Debug"):
+            ret.responseMsg = f"Cannot add player with invalid ID of: {userID}"
+            Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
+            return ret
+
+        # Check if the player has been kicked before
+        if userID in self.kickedPlayers:
+            ret.responseMsg = f"Player {playerName} has been kicked from the game, cannot rejoin the game."
             Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
             return ret
 
@@ -184,8 +196,44 @@ class Game:
 
         return ret
 
-    def removePlayer(self, playerName: str) -> Result:
-        return Result(False)
+    def kickPlayer(self, playerID: int) -> Result:
+        ret = Result(False)
+        kickPlayer = Player("", -1)
+
+        # Try to find the player among the existing game players
+        for player in self.players:
+            if player.userID == playerID:
+                kickPlayer = player
+                break
+
+        # Bail if we couldn't find the player
+        if kickPlayer.userID < 0:
+            ret.responseMsg = f"No player with ID {playerID} exists in the game currently."
+            Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
+            return ret
+
+        # Set player validity to false. Some procedures check this value before processing
+        kickPlayer.valid = False
+
+        # Add player to the game's kick list
+        self.kickedPlayers.add(playerID)
+
+        # Remove player from the game player list
+        self.players.remove(kickPlayer)
+
+        # Remove from player bingos, if any
+        self.playerBingos.remove(kickPlayer.card.getCardOwner())
+
+        # Remove player from any requested calls
+        for request in self.requestedCalls:
+            request.removePlayer(kickPlayer)
+
+        return ret
+
+    def banPlayer(self, playerID: int) -> Result:
+        ret = self.kickPlayer(playerID)
+        # TODO SCH Add player ID to persistence
+        return ret
 
     def makeCall(self, index: int) -> Result:
         ret = Result(False)
@@ -230,7 +278,7 @@ class Game:
 
         # Make sure the player is still playing the game
         if not self.getPlayer(callRequest.getRequesterName()).result:
-            ret.responseMsg = f"Player {callRequest.players[0].card.getCardOwner()} has not been added\
+            ret.responseMsg = f"Player {callRequest.getPrimaryRequester().card.getCardOwner()} has not been added\
  to the game. Rejecting the request call."
             Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
             return ret
