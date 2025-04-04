@@ -6,6 +6,7 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
+from .BannedData import BannedData
 from .Bing import Bing
 from .Binglets import Binglets
 from .CallRequest import CallRequest
@@ -39,6 +40,7 @@ class Game:
 
     def __init__(self):
         self.config: Config = Config()
+        self.bannedPlayers = BannedData()
         self.persistentStats: Union[PersistentStats, None] = None
         self.state: GameState = GameState.NEW
 
@@ -141,6 +143,12 @@ class Game:
             Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
             return ret
 
+        # Check if the player has been banned
+        if self.bannedPlayers.isBanned(userID):
+            ret.responseMsg = f"Cannot add a player that has been banned from bingo."
+            Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
+            return ret
+
         # Check if the player has been kicked before
         if userID in self.kickedPlayers:
             ret.responseMsg = f"Player {playerName} has been kicked from the game, cannot rejoin the game."
@@ -228,11 +236,14 @@ class Game:
         for request in self.requestedCalls:
             request.removePlayer(kickPlayer)
 
+        ret.result = True
+        ret.additional = kickPlayer
         return ret
 
-    def banPlayer(self, playerID: int) -> Result:
+    def banPlayer(self, playerID: int, playerName: str) -> Result:
         ret = self.kickPlayer(playerID)
-        # TODO SCH Add player ID to persistence
+        # Ban regardless of kickPlayer result
+        self.bannedPlayers.addBanned(playerID, playerName)
         return ret
 
     def makeCall(self, index: int) -> Result:

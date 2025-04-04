@@ -14,6 +14,7 @@ from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 
 from game.ActionData import ActionData
+from game.BannedData import BannedData
 from game.GameStore import GameStore
 
 from discord.app_commands import AppCommandContext, CommandTree
@@ -38,6 +39,12 @@ class AdminCommandHandler:
                 description="Ban a player from playing, forever.",
                 callback=self.banPlayer,
                 allowed_contexts=appContext,
+            ),
+            Command(
+                name="unban_player",
+                description="Unban a player from the livestream bingo games.",
+                callback=self.unbanPlayer,
+                allowed_contexts=appContext
             )
         ]
 
@@ -67,18 +74,25 @@ class AdminCommandHandler:
     @discord.app_commands.checks.has_role(Config().getConfig("GameMasterRole"))
     async def banPlayer(self, interaction: discord.Interaction, member: discord.Member):
         AdminCommandHandler.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Admin command ban player called.")
+        await interaction.response.send_message(f"\U0000274C\U0001F528 Banning user {member.display_name} from all further games!")
 
-        # Make sure the game instance exists
+        # If there is no game instance, just add the player directly to the ban list
         game = GameStore().getGame(interaction.guild_id or -1)
         if not game:
-            gName = interaction.guild.name if interaction.guild else "N/A"
-            await interaction.response.send_message(f"\U0000274C There is no active game for server {gName}")
-            return
+            BannedData().addBanned(member.id, member.display_name)
+        # Otherwise, ban through the game instance
+        else:
+            game = cast(IAsyncDiscordGame, game)
+            _ = game.banPlayer(ActionData(member=member))
 
-        # Ban player
-        await interaction.response.send_message(f"\U0000274C\U0001F528 Banning user {member.display_name} from all further games!")
-        game = cast(IAsyncDiscordGame, game)
-        _ = game.banPlayer(ActionData(member=member))
+    @discord.app_commands.describe(member="User to unban")
+    @discord.app_commands.checks.has_role(Config().getConfig("GameMasterRole"))
+    async def unbanPlayer(self, interaction: discord.Interaction, member: discord.Member):
+        AdminCommandHandler.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Admin command unban player called.")
+        await interaction.response.send_message(f"\U0001F607 Unbanning user {member.display_name}")
+
+        # Remove player from the unban list
+        BannedData().removeBanned(member.id)
 
     async def _handleError(self, _, interaction: discord.Interaction, error):
         if interaction.command:

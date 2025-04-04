@@ -23,6 +23,7 @@ class SavedData:
         return cls.__instance
 
     def __init__(self):
+        # TODO SCH Append the guild ID to the failename to support multi guild
         self.dataFile = Path(GLOBALVARS.FILE_GAME_DATA)
         self.data: dict[str, str] = {}
 
@@ -32,6 +33,9 @@ class SavedData:
         self.flush()
 
     def flush(self):
+        if not self.data:
+            return
+
         with self.dataFile.open("w") as file:
             json.dump(self.data, file, indent=4)
             SavedData.__LOGGER.log(LogLevel.LEVEL_INFO, "Game data has been saved.")
@@ -43,10 +47,10 @@ class SavedData:
         self.data[key] = val
 
     def _loadData(self):
-        SavedData.__LOGGER.log(LogLevel.LEVEL_INFO, "Reading in saved game data.")
         if not self.dataFile.exists():
             return
-        else:
-            with self.dataFile.open("r") as file:
-                self.data = json.load(file)
+
+        SavedData.__LOGGER.log(LogLevel.LEVEL_INFO, "Reading in saved game data.")
+        with self.dataFile.open("r") as file:
+            self.data = json.load(file)
 

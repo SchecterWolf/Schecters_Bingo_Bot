@@ -42,7 +42,6 @@ class IChannelInterface(ABC):
         self._currentView: ChannelView = ChannelView.INIT
 
     async def sendNotice(self, notice: str):
-        await self._deleteChannelItem(IChannelInterface.__MSG_NOTICE)
         await self.sendNoticeItem(content=f"NOTICE: {notice}")
 
     async def sendNoticeItem(self, **kwargs):

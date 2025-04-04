@@ -17,6 +17,7 @@ class GLOBALVARS:
 
     FILE_CONFIG_GENERAL = PROJ_ROOT + "/config/config.json"
     FILE_CONFIG_BINGLETS = PROJ_ROOT + "/config/binglets.json"
+    FILE_BANNED_DATA = DIR_DATA + "/banned.json"
     FILE_GAME_DATA = DIR_DATA + "/game.json"
     FILE_PLAYER_DATA = DIR_DATA + "/players.json"
 

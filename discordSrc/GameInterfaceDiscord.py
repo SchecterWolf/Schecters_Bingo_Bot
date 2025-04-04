@@ -218,7 +218,7 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Kicking player {user.display_name} ({user.id})")
 
         if not self.initialized:
-            ret.responseMsg = "Discord interface not initialized, cannot add player."
+            ret.responseMsg = "Discord interface not initialized, cannot kick player."
 
         # Kick the player from the game
         ret = self.game.kickPlayer(user.id)
@@ -227,13 +227,24 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         if ret.result:
             await self.channelBingo.refreshGameStatus()
 
+        # Update the user view
+        if ret.result:
+            kickedPlayer = cast(Player, ret.additional)
+            if kickedPlayer.ctx:
+                await kickedPlayer.ctx.setViewKicked()
+
         return ret
 
     @sync_aware
     async def banPlayer(self, data: ActionData) -> Result:
         # Invoke without the sync wrapper since we're internal and do want to block
-        ret = await self.kickPlayer.__wrapped__()
-        return ret
+        await self.kickPlayer.__wrapped__(data)
+        user: discord.Member = data.get("member")
+        GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Banning player {user.display_name} ({user.id})")
+
+        # Ban player regardless of kickPlayer result
+        self.game.banPlayer(user.id, user.display_name)
+        return Result(True)
 
     @sync_aware
     async def makeCall(self, data: ActionData) -> Result:
