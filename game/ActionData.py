@@ -17,6 +17,9 @@ class ActionData:
     POD object for adding context data to game calls within IGameInterface objects
     """
     def __init__(self, **kwargs):
+        self.add(**kwargs)
+
+    def add(self, **kwargs):
         for key, val in kwargs.items():
             self.__setattr__(key, val)
 

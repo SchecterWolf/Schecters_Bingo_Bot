@@ -14,6 +14,7 @@ from config.ClassLogger import ClassLogger, LogLevel
 from discord.ui import View, Button
 from game.ActionData import ActionData
 from game.GameStore import GameStore
+from game.Result import Result
 from typing import cast
 
 class AddPlayerButton(View, IContentItem):
@@ -50,8 +51,19 @@ class AddPlayerButton(View, IContentItem):
         button.callback = self.confirm_callback
         dmView.add_item(button)
 
-        # TODO SCH Use a vulger language filter to check username before adding
-        #           Useful libs: better_profanity, profanity-check
+        # Make sure there is a game
+        iface = GameStore().getGame(self.gameID)
+        if not iface:
+            await interaction.response.send_message("No game seems to be running, try again later", ephemeral=True)
+            return
+
+        # Check if the player is eligible
+        res = iface.game.checkEligible(interaction.user.id)
+        if not res.result:
+            await interaction.response.send_message(res.responseMsg, ephemeral=True)
+            return
+
+        # Send comfirmation DM
         try:
             message = await interaction.user.send(self._getGreeting(cast(discord.User, interaction.user)), view=dmView)
             self.confirmMsgID = message.id

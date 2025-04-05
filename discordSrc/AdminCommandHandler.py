@@ -9,6 +9,8 @@ __email__ = "--"
 import discord
 
 from .IAsyncDiscordGame import IAsyncDiscordGame
+from .GameControllerDiscord import GameControllerDiscord
+from .GameGuild import GameGuild
 
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
@@ -20,7 +22,7 @@ from game.GameStore import GameStore
 from discord.app_commands import AppCommandContext, CommandTree
 from discord.app_commands.commands import Command
 
-from typing import cast
+from typing import Union, cast
 
 class AdminCommandHandler:
     __LOGGER = ClassLogger(__name__)
@@ -30,19 +32,19 @@ class AdminCommandHandler:
         self.listCommands: list[Command] = [
             Command(
                 name="kick_player",
-                description="Kick a player from the remainder of the game.",
+                description="[ADMIN] Kick a player from the remainder of the game.",
                 callback=self.kickPlayer,
                 allowed_contexts=appContext,
             ),
             Command(
                 name="ban_player",
-                description="Ban a player from playing, forever.",
+                description="[ADMIN] Ban a player from playing, forever.",
                 callback=self.banPlayer,
                 allowed_contexts=appContext,
             ),
             Command(
                 name="unban_player",
-                description="Unban a player from the livestream bingo games.",
+                description="[ADMIN] Unban a player from the livestream bingo games.",
                 callback=self.unbanPlayer,
                 allowed_contexts=appContext
             )
@@ -76,14 +78,21 @@ class AdminCommandHandler:
         AdminCommandHandler.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Admin command ban player called.")
         await interaction.response.send_message(f"\U0000274C\U0001F528 Banning user {member.display_name} from all further games!")
 
-        # If there is no game instance, just add the player directly to the ban list
-        game = GameStore().getGame(interaction.guild_id or -1)
-        if not game:
-            BannedData().addBanned(member.id, member.display_name)
-        # Otherwise, ban through the game instance
-        else:
+        guildID = interaction.guild_id or -1
+        game = GameStore().getGame(guildID)
+        # Ban through the game instance
+        if game:
             game = cast(IAsyncDiscordGame, game)
             _ = game.banPlayer(ActionData(member=member))
+        # Otherwise, just add the player directly to the ban list
+        else:
+            BannedData().addBanned(member.id, member.display_name)
+            gameController = GameStore().getController()
+            guild: Union[GameGuild, None] = None
+            if gameController:
+                guild = cast(GameControllerDiscord, gameController).getGuild(guildID)
+            if guild:
+                guild.persistentStats.removePlayer(member.id)
 
     @discord.app_commands.describe(member="User to unban")
     @discord.app_commands.checks.has_role(Config().getConfig("GameMasterRole"))

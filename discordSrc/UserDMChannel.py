@@ -58,9 +58,9 @@ class UserDMChannel(IChannelInterface):
             except Exception as e:
                 UserDMChannel.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Failed to remove card file for player \"{self.player.card.getCardOwner()}\": {e}")
 
-    async def setViewKicked(self):
+    async def setViewKicked(self, action: str):
         await self._purgeChannel()
-        await self.sendNotice("\U0000274C\U0001F528 Sorry, you have been kicked from playing the livestream bingo.")
+        await self.sendNotice(f"\U0000274C\U0001F528 Sorry, you have been {action} from playing the livestream bingo.")
 
     async def refreshRequestView(self):
         self.requestView.refreshView()

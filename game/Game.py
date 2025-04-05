@@ -137,27 +137,10 @@ class Game:
             Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
             return ret
 
-        # Make sure the user has a valid player ID
-        if userID < 0 and not Config().getConfig("Debug"):
-            ret.responseMsg = f"Cannot add player with invalid ID of: {userID}"
+        # Check if player is eligible
+        ret = self.checkEligible(player)
+        if not ret.result:
             Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
-            return ret
-
-        # Check if the player has been banned
-        if self.bannedPlayers.isBanned(userID):
-            ret.responseMsg = f"Cannot add a player that has been banned from bingo."
-            Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
-            return ret
-
-        # Check if the player has been kicked before
-        if userID in self.kickedPlayers:
-            ret.responseMsg = f"Player {playerName} has been kicked from the game, cannot rejoin the game."
-            Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
-            return ret
-
-        # Check if player has already been added to the game
-        if player in self.players:
-            ret.responseMsg = f"Player \"{playerName}\" has already been added to the game."
             return ret
 
         # Try to generate a unique game card for the player for a given number of tries
@@ -227,10 +210,10 @@ class Game:
         self.kickedPlayers.add(playerID)
 
         # Remove player from the game player list
-        self.players.remove(kickPlayer)
+        self.players.discard(kickPlayer)
 
         # Remove from player bingos, if any
-        self.playerBingos.remove(kickPlayer.card.getCardOwner())
+        self.playerBingos.discard(kickPlayer.card.getCardOwner())
 
         # Remove player from any requested calls
         for request in self.requestedCalls:
@@ -242,8 +225,14 @@ class Game:
 
     def banPlayer(self, playerID: int, playerName: str) -> Result:
         ret = self.kickPlayer(playerID)
+
         # Ban regardless of kickPlayer result
         self.bannedPlayers.addBanned(playerID, playerName)
+
+        # Remove player from the saved player data
+        if self.persistentStats:
+            self.persistentStats.removePlayer(playerID)
+
         return ret
 
     def makeCall(self, index: int) -> Result:
@@ -365,6 +354,37 @@ class Game:
 
     def getCalls(self) -> List[Bing]:
         return list(self.calledBings)
+
+    def checkEligible(self, player: Union[Player, int]) -> Result:
+        ret = Result(False)
+        pl = player if not isinstance(player, int) else Player(" ", player)
+        name = "You are" if isinstance(player, int) else f"{player.card.getCardOwner()} is"
+
+        # Make sure the user has a valid player ID
+        if pl.userID < 0 and not Config().getConfig("Debug"):
+            ret.responseMsg = f"Cannot add player with invalid ID of: {pl.userID}"
+            return ret
+
+        # Check if the player has been banned
+        if self.bannedPlayers.isBanned(pl.userID):
+            ret.responseMsg = f"{name} banned from the game."
+            return ret
+
+        # Check if the player has been kicked before
+        if pl.userID in self.kickedPlayers:
+            ret.responseMsg = f"{name} kicked from the game, cannot rejoin."
+            return ret
+
+        # Check if player has already been added to the game
+        if pl in self.players:
+            ret.responseMsg = f"{name} already playing the game."
+            return ret
+
+        # TODO SCH Use a vulger language filter to check username before adding
+        #           Useful libs: better_profanity, profanity-check
+
+        ret.result = True
+        return ret
 
     def _resetGame(self):
         self.players.clear()

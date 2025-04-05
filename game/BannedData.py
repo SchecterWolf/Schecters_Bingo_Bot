@@ -49,20 +49,23 @@ class BannedData:
         return str(playerID) in self.data
 
     def addBanned(self, playerID: int, playerName: str):
+        BannedData.__LOGGER.log(LogLevel.LEVEL_INFO, f"Player ID {playerID} has been added to the banned list.")
         self.data[str(playerID)] = {
             BannedData.__FIELD_BANNED_DATA_NAME: playerName,
             BannedData.__FIELD_BANNED_DATA_TIMESTAMP: str(time.time())
         }
+        self.flush()
 
     def removeBanned(self, playerID: int):
         if str(playerID) in self.data:
+            BannedData.__LOGGER.log(LogLevel.LEVEL_INFO, f"Player ID {playerID} has been removed from the banned list.")
             del self.data[str(playerID)]
 
     def _loadData(self):
         if not self.bannedFile.exists():
             return
 
-        BannedData.__LOGGER.log(LogLevel.LEVEL_INFO, "Readingf in banned player data.")
+        BannedData.__LOGGER.log(LogLevel.LEVEL_INFO, "Reading in banned player data.")
         with self.bannedFile.open("r") as file:
             self.data = json.load(file)
 

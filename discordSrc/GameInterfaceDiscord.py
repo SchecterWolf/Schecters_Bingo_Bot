@@ -229,16 +229,18 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
         # Update the user view
         if ret.result:
+            action = "banned" if data.has("banned") else "kicked"
             kickedPlayer = cast(Player, ret.additional)
             if kickedPlayer.ctx:
-                await kickedPlayer.ctx.setViewKicked()
+                await kickedPlayer.ctx.setViewKicked(action)
 
         return ret
 
     @sync_aware
     async def banPlayer(self, data: ActionData) -> Result:
+        data.add(banned=True)
         # Invoke without the sync wrapper since we're internal and do want to block
-        await self.kickPlayer.__wrapped__(data)
+        await self.kickPlayer.__wrapped__(data) # TODO SCH If this work, get rid of the _intrlDeleteRequest and use this method
         user: discord.Member = data.get("member")
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Banning player {user.display_name} ({user.id})")
 

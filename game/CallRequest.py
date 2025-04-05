@@ -34,7 +34,7 @@ This requests bing index is f{self.requestBing.bingIdx} and the merge's bing ind
         return request.requestBing.bingIdx == self.requestBing.bingIdx
 
     def removePlayer(self, player: Player):
-        self.players.remove(player)
+        self.players.discard(player)
 
     def getPrimaryRequester(self) -> Player:
         return Player("", -1) if not self.players else list(self.players)[0]

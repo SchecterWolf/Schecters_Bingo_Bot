@@ -20,7 +20,7 @@ from game.IGameController import IGameController
 from game.Result import Result
 from game.Sync import sync_aware
 
-from typing import Dict, cast
+from typing import Dict, Union, cast
 
 class GameControllerDiscord(IGameController):
     __LOGGER = ClassLogger(__name__)
@@ -32,6 +32,9 @@ class GameControllerDiscord(IGameController):
 
     def getBotClient(self) -> discord.Client:
         return self.bot
+
+    def getGuild(self, guildID: int) -> Union[GameGuild, None]:
+        return self.gameGuilds.get(guildID)
 
     def startGame(self, *args, **kwargs):
         self._startGameInternal(*args, **kwargs)

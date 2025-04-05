@@ -94,7 +94,7 @@ class TaskProcessor:
         asyncio.set_event_loop(self.loop)
         while self.running:
             task  = self.taskQueue.get() # Wait for a task to become available
-            self.taskIDs.remove(self._getTaskID(task))
+            self.taskIDs.discard(self._getTaskID(task))
             if self.running:
                 TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Executing task: {task}")
                 future = asyncio.run_coroutine_threadsafe(task.execTask(), self.loop)
