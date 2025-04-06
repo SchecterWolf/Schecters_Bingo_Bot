@@ -174,4 +174,5 @@ cython_debug/
 log.txt
 config/token.txt
 resources/cards/*
+resources/data/*
 

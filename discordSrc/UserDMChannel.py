@@ -49,19 +49,20 @@ class UserDMChannel(IChannelInterface):
 
     @verifyView(ChannelView.STOPPED)
     async def setViewStopped(self):
-        UserDMChannel.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Setting DM channel to stopped for player: {self.player.card.getCardOwner()}.") # TODO SCH rm
         await self._deleteChannelItem(UserDMChannel.__MSG_REQUEST_CALL)
-        await self.removeNotice()
         await self.sendNotice(Config().getFormatConfig("StreamerName", GLOBALVARS.GAME_MSG_ENDED))
         if self.cardFile and os.path.exists(self.cardFile):
             try:
                 os.remove(self.cardFile)
                 UserDMChannel.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Deleted user card {self.cardFile}")
             except Exception as e:
-                UserDMChannel.__LOGGER.log(LogLevel.LEVEL_ERROR, "Failed to remove card file for player \"{self.player.card.getCardOwner()}\": {e}")
+                UserDMChannel.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Failed to remove card file for player \"{self.player.card.getCardOwner()}\": {e}")
+
+    async def setViewKicked(self, action: str):
+        await self._purgeChannel()
+        await self.sendNotice(f"\U0000274C\U0001F528 Sorry, you have been {action} from playing the livestream bingo.")
 
     async def refreshRequestView(self):
-        UserDMChannel.__LOGGER.log(LogLevel.LEVEL_DEBUG, "refreshRequestView called") # TODO SCH rm
         self.requestView.refreshView()
         await self._updateChannelItem(UserDMChannel.__MSG_REQUEST_CALL, content=self.requestView.msgStr, view=self.requestView)
 
@@ -76,5 +77,4 @@ class UserDMChannel(IChannelInterface):
             await self._updateChannelItem(UserDMChannel.__MSG_BINGO_BOARD, file=file, embed=embed)
         else:
             await self._updateChannelItem(UserDMChannel.__MSG_BINGO_BOARD, embed=embed, attachments=[file])
-        UserDMChannel.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Updating player card finished") # TODO SCH rm
 

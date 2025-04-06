@@ -10,11 +10,11 @@ import discord
 
 from .IContentItem import IContentItem
 
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 from discord.ui import View, Button
 from game.ActionData import ActionData
 from game.GameStore import GameStore
+from game.Result import Result
 from typing import cast
 
 class AddPlayerButton(View, IContentItem):
@@ -51,8 +51,19 @@ class AddPlayerButton(View, IContentItem):
         button.callback = self.confirm_callback
         dmView.add_item(button)
 
-        # TODO SCH Use a vulger language filter to check username before adding
-        #           Useful libs: better_profanity, profanity-check
+        # Make sure there is a game
+        iface = GameStore().getGame(self.gameID)
+        if not iface:
+            await interaction.response.send_message("No game seems to be running, try again later", ephemeral=True)
+            return
+
+        # Check if the player is eligible
+        res = iface.game.checkEligible(interaction.user.id)
+        if not res.result:
+            await interaction.response.send_message(res.responseMsg, ephemeral=True)
+            return
+
+        # Send confirmation DM
         try:
             message = await interaction.user.send(self._getGreeting(cast(discord.User, interaction.user)), view=dmView)
             self.confirmMsgID = message.id
@@ -70,12 +81,8 @@ class AddPlayerButton(View, IContentItem):
             await message.delete()
             self.confirmMsgID = -1
 
-        # Add the player to the game
-        AddPlayerButton.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Calling add player callback...") # TODO SCH rm
-
         game = GameStore().getGame(self.gameID)
         if game:
-            # TODO SCH Check if i even need to assign to an unused var (because of the sync_aware decorator)
             _ = game.addPlayer(ActionData(interaction=interaction, displayName=interaction.user.display_name))
 
     def _getGreeting(self, user: discord.User) -> str:

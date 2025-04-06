@@ -27,7 +27,12 @@ class Binglets:
         return cls.__instance
 
     def __init__(self):
+        # Init guard
+        if hasattr(self, "initialized"):
+            return
+
         self.bingletsFile = Path(GLOBALVARS.FILE_CONFIG_BINGLETS)
+        self.initialized = True
 
     def getBingletsCopy(self) -> List[Bing]:
         if not Binglets.__bings_ary:

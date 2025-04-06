@@ -48,6 +48,14 @@ class IAsyncDiscordGame(IGameInterface):
         pass
 
     @abstractmethod
+    async def kickPlayer(self, data: ActionData) -> Result:
+        pass
+
+    @abstractmethod
+    async def banPlayer(self, data: ActionData) -> Result:
+        pass
+
+    @abstractmethod
     async def makeCall(self, data: ActionData) -> Result:
         pass
 

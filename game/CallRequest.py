@@ -10,16 +10,17 @@ from .Player import Player
 from config.ClassLogger import ClassLogger
 from config.Log import LogLevel
 from game.Bing import Bing
+from typing import Set
 
 class CallRequest:
     __LOGGER = ClassLogger(__name__)
 
     def __init__(self, player: Player, requestBing: Bing):
-        self.players = [player]
+        self.players: Set[Player] = {player}
         self.requestBing = requestBing
 
     def getRequesterName(self) -> str:
-        return "" if not self.players else self.players[0].card.getCardOwner()
+        return "" if not self.players else self.getPrimaryRequester().card.getCardOwner()
 
     def mergeRequests(self, request: "CallRequest"):
         if not self.isMatchingRequest(request):
@@ -27,8 +28,14 @@ class CallRequest:
 This requests bing index is f{self.requestBing.bingIdx} and the merge's bing index is f{request.requestBing.bingIdx}")
             return
 
-        self.players.extend(request.players)
+        self.players.update(request.players)
 
     def isMatchingRequest(self, request: "CallRequest") -> bool:
         return request.requestBing.bingIdx == self.requestBing.bingIdx
+
+    def removePlayer(self, player: Player):
+        self.players.discard(player)
+
+    def getPrimaryRequester(self) -> Player:
+        return Player("", -1) if not self.players else list(self.players)[0]
 

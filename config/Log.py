@@ -46,11 +46,14 @@ class Logger:
         return cls._instance
 
     def __init__(self):
-        if not hasattr(self, 'init'):
-            self.log_level: LogLevel = self._getLoglevelFromStr(Config().getConfig('LogLevel', "NONE"))
-            self.log_file = None
-            self.lock = threading.Lock()
-            self.init = True
+        # Init guard
+        if hasattr(self, "initialized"):
+            return
+
+        self.log_level: LogLevel = self._getLoglevelFromStr(Config().getConfig('LogLevel', "NONE"))
+        self.log_file = None
+        self.lock = threading.Lock()
+        self.initialized = True
 
     def __del__(self):
         if self.log_file:

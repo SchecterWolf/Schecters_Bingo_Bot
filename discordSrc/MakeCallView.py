@@ -74,7 +74,6 @@ class MakeCallView(View, IContentItem):
             self.add_item(selectMenu)
 
     async def refreshView(self, interaction: discord.Interaction):
-        MakeCallView.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Refreshing view called...") # TODO SCH rm?
         if interaction.message:
             MakeCallView.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Refreshing the make call views message.")
             await interaction.message.edit(view=self)

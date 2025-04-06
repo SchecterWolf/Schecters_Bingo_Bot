@@ -6,6 +6,7 @@
     "Debug": true,
     "DiscordLink": "https://discord.gg/YjdDtT8q",
     "Font": "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "GameMasterRole": "GameMaster",
     "LogLevel": "debug",
     "Mode": "discord",
     "RetroactiveCalls": true,

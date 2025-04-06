@@ -17,10 +17,6 @@ from config.Globals import GLOBALVARS
 from game.CallRequest import CallRequest
 from typing import List
 
-# TODO SCH rm
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
-
 class AdminChannel(IChannelInterface):
     __MSG_GAME_CONTROLS = "gamecontrols"
     __MSG_MAKE_CALL = "makecall"
@@ -32,10 +28,6 @@ class AdminChannel(IChannelInterface):
         self.callView = MakeCallView(gameGuild.guildID)
         self.gameControls = GameControls(gameGuild.guildID)
         self.requestsViews: List[RequestView] = []
-
-        # TODO SCH Add the views:
-        #   * Retract call
-        #   * Current game admin stats (Number of times each bing has been called, etc)
 
     @verifyView(ChannelView.NEW)
     async def setViewNew(self):
@@ -100,7 +92,6 @@ class AdminChannel(IChannelInterface):
             await self._deleteChannelItem(req.viewID)
 
     async def _addAllRequestViews(self):
-        ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, "Adding all request views")
         for req in self.requestsViews:
             await self._updateChannelItem(req.viewID, content=req.viewText, view=req)
 

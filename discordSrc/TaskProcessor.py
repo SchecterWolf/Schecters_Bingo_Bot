@@ -32,8 +32,9 @@ class TaskUpdateUserDMs:
         return f" Update \"{playerName}\" DM"
 
     async def execTask(self):
-        TaskUpdateUserDMs.__LOGGER.log(LogLevel.LEVEL_DEBUG, "execTask called----") # TODO SCH rm
-        if not self.player:
+        if not self.player or not self.player.valid:
+            name = self.player.card.getCardOwner() if self.player else ""
+            TaskUpdateUserDMs.__LOGGER.log(LogLevel.LEVEL_WARN, f"Skipping task for invalid user {name}")
             return
 
         ctx = self.player.ctx
@@ -56,6 +57,7 @@ class TaskProcessor:
         self.processorThread = threading.Thread(target=self._threadEntry)
         self.running = False
         self.taskQueue: Queue[TaskUpdateUserDMs] = Queue()
+        self.taskIDs: set[str] = set()
 
     def init(self):
         if self.running:
@@ -74,30 +76,34 @@ class TaskProcessor:
         self.processorThread.join()
         TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Task processor signaled to shut down.") # TODO SCH rm
 
+    # Adds a task to the process queue only if a task of the same type isnt already queued
     def addTask(self, task: TaskUpdateUserDMs):
-        if self.running:
+        taskID = self._getTaskID(task)
+        if self.running and taskID not in self.taskIDs:
             TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Adding new task to processor queue: {task}")
-            # TODO SCH Check if the player already has a task in queue. If they do, skip adding
-            #           A new task, since the update will handle any new changes after the initial
-            #           task was added
+            self.taskIDs.add(taskID)
             self.taskQueue.put(task)
 
     def _threadEntry(self):
         TaskProcessor.__LOGGER.log(LogLevel.LEVEL_INFO, "Task processor thread running.")
 
-        # TODO SCH even though the eventual async calls into the discord bot SDK from the task
-        #           will reconverge with the other thread (because the bot can use one and only one
-        #           async event loop), lets still utilize this threads task queue to "process" one bot
-        #           task at a time, in sequence. This will allow other bot async tasks to be "injected"
-        #           into the event queue as interactions happen. This will allow the bot to still be
-        #           responsive to the UI
+        # Note: Since there is only one async event loop handler (that is owned by the discord bot),
+        #       this flow of control will reconverge onto the bot thread. However, this thread allows
+        #       us to control when tasks get added to the loop so the discord bot can still be reactive
+        #       to other tasks during this class's processing
         asyncio.set_event_loop(self.loop)
         while self.running:
             task  = self.taskQueue.get() # Wait for a task to become available
+            self.taskIDs.discard(self._getTaskID(task))
             if self.running:
                 TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Executing task: {task}")
                 future = asyncio.run_coroutine_threadsafe(task.execTask(), self.loop)
                 future.result(timeout=5.0)
+                self.taskQueue.task_done()
 
         TaskProcessor.__LOGGER.log(LogLevel.LEVEL_INFO, "Task processor thread ended.")
+
+    def _getTaskID(self, task: TaskUpdateUserDMs) -> str:
+        pID = str(task.player.userID) if task.player else ""
+        return task.__class__.__name__ + pID
 

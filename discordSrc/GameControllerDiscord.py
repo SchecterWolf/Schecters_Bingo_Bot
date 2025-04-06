@@ -20,7 +20,7 @@ from game.IGameController import IGameController
 from game.Result import Result
 from game.Sync import sync_aware
 
-from typing import Dict, cast
+from typing import Dict, Union, cast
 
 class GameControllerDiscord(IGameController):
     __LOGGER = ClassLogger(__name__)
@@ -33,8 +33,10 @@ class GameControllerDiscord(IGameController):
     def getBotClient(self) -> discord.Client:
         return self.bot
 
+    def getGuild(self, guildID: int) -> Union[GameGuild, None]:
+        return self.gameGuilds.get(guildID)
+
     def startGame(self, *args, **kwargs):
-        GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"startGame called") # TODO SCH rm
         self._startGameInternal(*args, **kwargs)
 
     def stopGame(self, *args, **kwargs):
@@ -67,12 +69,10 @@ class GameControllerDiscord(IGameController):
             GameStore().addGame(guild.id, newGame)
 
         # Init and start the game
-        GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "calling newGame.initGame") # TODO SCH rm
         if newGame and isinstance(newGame, IAsyncDiscordGame):
             if not (await newGame.init()).result:
                 ret.responseMsg = "Failed to initialize game. Aborting."
             else:
-                GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "calling newGame.startGame") # TODO SCH rm
                 ret = await newGame.start()
 
         # Teardown on error

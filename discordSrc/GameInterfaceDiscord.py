@@ -67,12 +67,10 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
         # Bingo view init
         if ret.result:
-            GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Creating BingoChannel.") # TODO SCH
             self.channelBingo = BingoChannel(self.bot, self.gameGuild)
 
         # Admin view init
         if ret.result:
-            GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Creating AdminChannel.") # TODO SCH
             self.channelAdmin = AdminChannel(self.gameGuild)
 
         # Set internal states
@@ -140,7 +138,6 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         await self._crankStateViews()
 
         # Update the user DM views
-        GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_WARN, "Attemping to set stopped view to all players") # TODO SCH rm
         for player in players:
             if player.ctx:
                 await player.ctx.setViewStopped()
@@ -172,8 +169,6 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         # Verify initialized
         if not self.initialized:
             ret.responseMsg = "Discord interface not initialized, cannot add player."
-        elif isinstance(user, discord.Member):
-            ret.responseMsg = "Invalid interaction user type"
         elif not user.dm_channel and not self.debugMode:
             ret.responseMsg = "Interaction issued with an empty DM channel, cannot add player."
         else:
@@ -214,6 +209,44 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         return ret
 
     @sync_aware
+    async def kickPlayer(self, data: ActionData) -> Result:
+        ret = Result(False)
+        user: discord.Member = data.get("member")
+        GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Kicking player {user.display_name} ({user.id})")
+
+        if not self.initialized:
+            ret.responseMsg = "Discord interface not initialized, cannot kick player."
+            return ret
+
+        # Kick the player from the game
+        ret = self.game.kickPlayer(user.id)
+
+        # Refresh views
+        if ret.result:
+            await self.channelBingo.refreshGameStatus()
+
+        # Update the user view
+        if ret.result:
+            action = "banned" if data.has("banned") else "kicked"
+            kickedPlayer = cast(Player, ret.additional)
+            if kickedPlayer.ctx:
+                await kickedPlayer.ctx.setViewKicked(action)
+
+        return ret
+
+    @sync_aware
+    async def banPlayer(self, data: ActionData) -> Result:
+        data.add(banned=True)
+        # Invoke without the sync wrapper since we're internal and do want to block
+        await self.kickPlayer.__wrapped__(self, data)
+        user: discord.Member = data.get("member")
+        GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Banning player {user.display_name} ({user.id})")
+
+        # Ban player regardless of kickPlayer result
+        self.game.banPlayer(user.id, user.display_name)
+        return Result(True)
+
+    @sync_aware
     async def makeCall(self, data: ActionData) -> Result:
         index: int = data.get("index")
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Call made for index: {index}")
@@ -246,7 +279,7 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
         # Remove any matching call requests
         if ret.result:
-            await self._intrlDeleteRequest(index)
+            await self.deleteRequest.__wrapped__(self, data)
 
         # Update the bingo channel with the call notice
         newPlayerBingos = ""
@@ -282,8 +315,9 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
             await self.channelAdmin.addCallRequest(ret.additional)
 
         # Let the player know that their call request was successfull
-        if ret.result and callRequest.players and callRequest.players[0].ctx:
-            await callRequest.players[0].ctx.sendNotice(ret.responseMsg)
+        player = callRequest.getPrimaryRequester()
+        if ret.result and player.ctx:
+            await player.ctx.sendNotice(ret.responseMsg)
 
         # Send notification to livestream
         if ret.result and self.YTiface:
@@ -294,9 +328,7 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
     @sync_aware
     async def deleteRequest(self, data: ActionData) -> Result:
         index: int = data.get("index")
-        return await self._intrlDeleteRequest(index)
 
-    async def _intrlDeleteRequest(self, index: int) -> Result:
         # Verify initialized
         if not self.initialized or not self.channelAdmin:
             return Result(False, response="Discord interface not initialized, cannot handle request.")
