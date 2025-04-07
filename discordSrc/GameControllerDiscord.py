@@ -20,7 +20,7 @@ from game.IGameController import IGameController
 from game.Result import Result
 from game.Sync import sync_aware
 
-from typing import Dict, Union, cast
+from typing import Dict, Optional, cast
 
 class GameControllerDiscord(IGameController):
     __LOGGER = ClassLogger(__name__)
@@ -33,7 +33,7 @@ class GameControllerDiscord(IGameController):
     def getBotClient(self) -> discord.Client:
         return self.bot
 
-    def getGuild(self, guildID: int) -> Union[GameGuild, None]:
+    def getGuild(self, guildID: int) -> Optional[GameGuild]:
         return self.gameGuilds.get(guildID)
 
     def startGame(self, *args, **kwargs):
@@ -66,7 +66,7 @@ class GameControllerDiscord(IGameController):
 
         # Go ahead an add the game to the store since the startup procedure needs it
         if ret.result and newGame:
-            GameStore().addGame(guild.id, newGame)
+            self.gameStore.addGame(guild.id, newGame)
 
         # Init and start the game
         if newGame and isinstance(newGame, IAsyncDiscordGame):
@@ -78,7 +78,7 @@ class GameControllerDiscord(IGameController):
         # Teardown on error
         if not ret.result:
             # Remove the game from the store
-            GameStore().removeGame(guild.id)
+            self.gameStore.removeGame(guild.id)
             # Destroy the new game
             if newGame:
                 GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_CRIT, "Destroying problematic game.")
@@ -93,13 +93,13 @@ class GameControllerDiscord(IGameController):
     async def _stopGameInternal(self, guildID: int) -> Result:
         GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_WARN, "Game signaled to be stopped for guild id {guildID}.")
         ret = Result(False)
-        game =GameStore().getGame(guildID)
+        game = self.gameStore.getGame(guildID)
 
         if not game:
             ret.responseMsg = f"No active game exists for guild \"{guildID}\", skipping stop game."
         elif isinstance(game, IAsyncDiscordGame):
             await game.destroy()
-            GameStore().removeGame(guildID)
+            self.gameStore.removeGame(guildID)
             ret.result = True
             ret.responseMsg = f"Bingo game stopped."
 

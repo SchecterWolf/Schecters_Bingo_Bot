@@ -17,7 +17,7 @@ from .Result import Result
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from enum import Enum
-from typing import List, Set, Union
+from typing import List, Optional, Set, Union
 
 class GameState(Enum):
     NEW = 1 # Uninitialized
@@ -41,7 +41,7 @@ class Game:
     def __init__(self):
         self.config: Config = Config()
         self.bannedPlayers = BannedData()
-        self.persistentStats: Union[PersistentStats, None] = None
+        self.persistentStats: Optional[PersistentStats] = None
         self.state: GameState = GameState.NEW
 
         self.calledBings: Set[Bing] = set()
@@ -392,7 +392,7 @@ class Game:
         self.requestedCalls.clear()
         self.playerBingos.clear()
 
-    def _decrementState(self, state: Union[GameState, None] = None) -> GameState:
+    def _decrementState(self, state: Optional[GameState] = None) -> GameState:
         enums = list(GameState)
         indexState = enums.index(state if state else self.state) - 1
         if indexState > 0:

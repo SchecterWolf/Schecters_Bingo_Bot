@@ -13,7 +13,9 @@ from .AdminCommandHandler import AdminCommandHandler
 from .DebugCommandHandler import DebugCommandHandler
 from .GameControllerDiscord import GameControllerDiscord
 from .GameGuild import GameGuild
+from .ICommandHandler import ICommandHandler
 from .LeaderboardCreator import LeaderboardCreator
+from .PlayerCommandHandler import PlayerCommandHandler
 from .StartGameButton import StartGameButton
 
 from config.ClassLogger import ClassLogger, LogLevel
@@ -26,7 +28,7 @@ from discord.ui import View
 from game.GameStore import GameStore
 from game.PersistentStats import PersistentStats
 
-from typing import Union
+from typing import Optional
 
 class Bot(Client):
     __LOGGER = ClassLogger(__name__)
@@ -51,7 +53,7 @@ class Bot(Client):
         super().__init__(intents=intents)
 
         self.gameGuilds: dict[int, GameGuild] = {}
-        self.debugCommands: Union[None, DebugCommandHandler] = None
+        self.debugCommands: Optional[DebugCommandHandler] = None
 
         self.initialized = True
 
@@ -73,16 +75,19 @@ class Bot(Client):
         await self.close()
 
     async def setup_hook(self):
-        self.adminCommands = AdminCommandHandler()
-        if Config().getConfig("Debug"):
-            self.debugCommands = DebugCommandHandler()
-
         self.tree = discord.app_commands.CommandTree(self)
-        self.adminCommands.setupCommands(self.tree)
-        if self.debugCommands:
-            self.debugCommands.setupCommands(self.tree)
+        self.slashCommands: list[ICommandHandler] = [
+            AdminCommandHandler(),
+            PlayerCommandHandler()
+        ]
+        if Config().getConfig("Debug"):
+            self.slashCommands.append(DebugCommandHandler())
+
+        for cmds in self.slashCommands:
+            cmds.setupCommands(self.tree)
         # Apparently this only has to be done once to register the commands
         if False:
+            print("SLASH COMMANDS SYNCING")
             try:
                 Bot.__LOGGER.log(LogLevel.LEVEL_CRIT, "Bot commands are syncing...")
                 await self.tree.sync()
