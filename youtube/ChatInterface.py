@@ -13,7 +13,7 @@ from config.Log import LogLevel
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-from typing import Any, List, Union
+from typing import Any, List, Optional
 
 class ChatInterface:
     __LOGGER = ClassLogger(__name__)
@@ -21,7 +21,7 @@ class ChatInterface:
 
     def __init__(self):
         self.initialized = False
-        self.chatID: Union[str, None] = None
+        self.chatID: Optional[str] = None
         self.pageToken: Any = None
 
     def init(self):

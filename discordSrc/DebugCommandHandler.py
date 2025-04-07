@@ -9,52 +9,47 @@ __email__ = "__"
 import aiohttp
 import discord
 
-from .IAsyncDiscordGame import IAsyncDiscordGame
+from .ICommandHandler import ICommandHandler
 
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Globals import GLOBALVARS
 
-from discord.app_commands import AppCommandContext, CommandTree
 from discord.app_commands.commands import Command
 
 from game.ActionData import ActionData
 from game.GameStore import GameStore
+from game.IGameInterface import IGameInterface
 
 from PIL import Image
 from io import BytesIO
-from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
-class DebugCommandHandler:
+class DebugCommandHandler(ICommandHandler):
     __LOGGER = ClassLogger(__name__)
     __DEBUG_ID_COUNTER = -1
 
     def __init__(self):
-        appContext = AppCommandContext(guild=True, dm_channel=False, private_channel=False)
-        self.listCommands: list[Command] = [
+        super().__init__()
+        self.listCommands = [
             Command(
                 name="add_player",
                 description="Add an ephemeral user",
                 callback=self.addPlayer,
-                allowed_contexts=appContext,
+                allowed_contexts=self.appContext,
             ),
             Command(
                 name="bulk_add_players",
                 description="Adds many ephemeral users (30)",
                 callback=self.bulkAddPlayers,
-                allowed_contexts=appContext
+                allowed_contexts=self.appContext
             ),
             Command(
                 name="save_avatar",
                 description="Saves the users avatar internally",
                 callback=self.saveAvatar,
-                allowed_contexts=appContext
+                allowed_contexts=self.appContext
             )
         ]
-
-    def setupCommands(self, tree: CommandTree):
-        for cmd in self.listCommands:
-            tree.add_command(cmd)
 
     async def saveAvatar(self, interaction: discord.Interaction):
         DebugCommandHandler.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Saving avatar for user \"{interaction.user.display_name}\"({interaction.user.id})")
@@ -88,7 +83,6 @@ class DebugCommandHandler:
         await interaction.response.send_message("Added bulk players to the game!")
 
         # Add mock players to game
-        game = cast(IAsyncDiscordGame, game)
         for player in mockPlayers:
             mockInter = self._makeMockInteraction(interaction)
             self._addPlayerIntrnl(game, mockInter, player, False)
@@ -106,7 +100,7 @@ class DebugCommandHandler:
 
         # Add mock player to the game
         await interaction.response.send_message(f"Mock user \"{message}\" as been added to the game.")
-        self._addPlayerIntrnl(cast(IAsyncDiscordGame, game), interaction, message, True)
+        self._addPlayerIntrnl(game, interaction, message, True)
 
     def _makeMockInteraction(self, interaction: discord.Interaction):
         mockInter = AsyncMock(spec=discord.Interaction)
@@ -134,7 +128,7 @@ class DebugCommandHandler:
 
         return mockInter
 
-    def _addPlayerIntrnl(self, game: IAsyncDiscordGame, interaction: discord.Interaction, player: str, refresh: bool):
+    def _addPlayerIntrnl(self, game: IGameInterface, interaction: discord.Interaction, player: str, refresh: bool):
         # Create the mock user
         mockUser = MagicMock(spec=discord.User)
         mockUser.id = DebugCommandHandler.__DEBUG_ID_COUNTER

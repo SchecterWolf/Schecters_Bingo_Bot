@@ -26,6 +26,10 @@ class GLOBALVARS:
     IMAGE_CARD_BG = DIR_RESOURCES + "/assets/CardBG.jpg"
     IMAGE_GLOBAL_BOARD = DIR_RESOURCES + "/assets/GameGlobalBoard.png"
     IMAGE_MISSING_PLAYER_ICON = DIR_RESOURCES + "/assets/MissingPlayerIcon.png"
+    IMAGE_RANK_BOARD = DIR_RESOURCES + "/assets/RankUI.png"
+    IMAGE_RANK_1ST_BOARD = DIR_RESOURCES + "/assets/RankUI1st.png"
+    IMAGE_RANK_2ND_BOARD = DIR_RESOURCES + "/assets/RankUI2nd.png"
+    IMAGE_RANK_3RD_BOARD = DIR_RESOURCES + "/assets/RankUI3rd.png"
 
     CHANNEL_BINGO = "bingo"
     CHANNEL_ADMIN_BINGO ="bingo-admin"

@@ -15,7 +15,7 @@ from .Bing import Bing
 from .Binglets import Binglets
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
-from typing import List, Union
+from typing import List, Optional
 
 class Card:
     ROW = 'row'
@@ -148,7 +148,7 @@ class Card:
     def getCardBings(self) -> List[List[Bing]]:
         return self.cells
 
-    def getBingFromID(self, bingID: int) -> Union[Bing, None]:
+    def getBingFromID(self, bingID: int) -> Optional[Bing]:
         return next((bing for row in self.cells for bing in row if bing.bingIdx == bingID), None)
 
     def isCellMarked(self, i, j) -> bool:

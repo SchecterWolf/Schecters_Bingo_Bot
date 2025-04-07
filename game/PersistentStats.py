@@ -16,7 +16,7 @@ from config.Config import Config
 from config.Globals import GLOBALVARS
 from game.SavedData import SavedData
 from pathlib import Path
-from typing import Deque, Dict, List, Union, cast
+from typing import Deque, Dict, List, Optional, Union, cast
 
 TypeDataStat = Dict[str, int]
 TypePlayerData = Dict[str, Union[str, TypeDataStat]]
@@ -28,14 +28,15 @@ class PlayerOrdinal:
         self.name = name
 
         self.stats: dict[str, TypeDataStat] = {}
+        self.points: dict[str, int] = {}
+        self.ranks: dict[str, int] = {}
+
         for cType in PersistentStats.LIST_CATEGORY_ITEMS:
             self.stats[cType] = {}
+            self.points[cType] = 0
+            self.ranks[cType] = 0
             for dType in PersistentStats.LIST_DATA_ITEMS:
                 self.stats[cType][dType] = 0
-
-        self.points: dict[str, int] = {}
-        for cType in PersistentStats.LIST_CATEGORY_ITEMS:
-            self.points[cType] = 0
 
 class PersistentStats():
     __LOGGER = ClassLogger(__name__)
@@ -60,7 +61,7 @@ class PersistentStats():
             PersistentStats.DATA_ITEM_GAMES: cfg.getConfig("BonusGamesPlayed", 1)
         }
 
-        self.topPlayers: dict[str, Deque] = {
+        self.topPlayers: dict[str, Deque[PlayerOrdinal]] = {
             PersistentStats.ITEM_TOTAL: Deque(),
             PersistentStats.ITEM_MONTH: Deque(),
             PersistentStats.ITEM_WEEK: Deque(),
@@ -115,11 +116,19 @@ class PersistentStats():
     def getBonus(self, bType: str) -> int:
         return self.bonuses.get(bType, 0)
 
-    def getTopPlayer(self, place: int, category: str = ITEM_TOTAL) -> Union[PlayerOrdinal, None]:
+    def getTopPlayer(self, place: int, category: str = ITEM_TOTAL) -> Optional[PlayerOrdinal]:
         ret = None
         leaderboard = self.topPlayers.get(category)
         if leaderboard and place - 1 < len(leaderboard):
             ret = leaderboard[place -1]
+        return ret
+
+    def getPlayer(self, playerID: int) -> Optional[PlayerOrdinal]:
+        ret = None
+        for player in self.topPlayers.get(PersistentStats.ITEM_TOTAL) or []:
+            if playerID == player.playerID:
+                ret = player
+                break
         return ret
 
     def _readInPlayerData(self):
@@ -154,6 +163,11 @@ class PersistentStats():
                     stats = cast(TypeDataStat, self._getPlayerStats(-1)[cType])
                 self._processStats(player, cType, stats)
 
+        # Set player rank value
+        for cType in PersistentStats.LIST_CATEGORY_ITEMS:
+            for idx, player in enumerate(self.topPlayers[cType]):
+                player.ranks[cType] = idx
+
     def _processStats(self, player: PlayerOrdinal, cType: str, stats: TypeDataStat):
         for dType in PersistentStats.LIST_DATA_ITEMS:
             val = stats.get(dType, 0)
@@ -171,9 +185,6 @@ class PersistentStats():
                 break
             idx = index + 1
         leaderboard.insert(idx, player)
-
-        if len(self.topPlayers) > 3:
-            leaderboard.pop()
 
     def _getPlayerStats(self, playerID: int) -> TypePlayerData:
         ret: dict = self.playerData.get(str(playerID), dict())

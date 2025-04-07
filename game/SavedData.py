@@ -11,7 +11,7 @@ import json
 from config.ClassLogger import ClassLogger, LogLevel # TODO SCH Update all files to include LogLevel from the ClassLogger from
 from config.Globals import GLOBALVARS
 from pathlib import Path
-from typing import Union
+from typing import Optional
 
 class SavedData:
     __instance = None
@@ -45,7 +45,7 @@ class SavedData:
             json.dump(self.data, file, indent=4)
             SavedData.__LOGGER.log(LogLevel.LEVEL_INFO, "Game data has been saved.")
 
-    def getData(self, key: str) -> Union[str, None]:
+    def getData(self, key: str) -> Optional[str]:
         return self.data.get(key)
 
     def saveData(self, key: str, val: str):

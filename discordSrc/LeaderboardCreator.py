@@ -6,19 +6,19 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
-import aiohttp
 import discord
 import textwrap
 
+from .IDiscordGraphical import IDiscordGraphical
+
 from PIL import Image, ImageFont, ImageDraw
-from config.ClassLogger import ClassLogger
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from config.Globals import GLOBALVARS
-from config.Log import LogLevel
 from game.PersistentStats import PersistentStats, PlayerOrdinal
 from io import BytesIO
 
-class LeaderboardCreator:
+class LeaderboardCreator(IDiscordGraphical):
     __LOGGER = ClassLogger(__name__)
 
     __AVATAR_SIZE = 441
@@ -45,7 +45,8 @@ class LeaderboardCreator:
     __TITLE_ROWS_MAX = 3
 
     def __init__(self, bot: discord.Client, globalStats: PersistentStats):
-        self.bot = bot
+        super().__init__(bot)
+
         self.globalStats = globalStats
         self.fontName = Config().getConfig("Font")
 
@@ -70,11 +71,13 @@ class LeaderboardCreator:
         for ordinal in list(range(0, 3)):
             player = self.globalStats.getTopPlayer(ordinal + 1)
             if player:
-                await self._addAvatar(canvas, player, self.avatarOffsets[ordinal])
+                avatar = await self._getDiscordAvatar(player, LeaderboardCreator.__AVATAR_SIZE)
+                canvas.paste(avatar, (self.avatarOffsets[ordinal], LeaderboardCreator.__AVATAR_YPOS), avatar)
 
-        # Overlay the leaderboard graphic on the avatar layer
+        # Overlay the leaderboard graphic on top of the avatar layer
         leaderboardGraphic = Image.alpha_composite(canvas, leaderboardGraphic)
 
+        # Add the leaderboard texts
         draw = ImageDraw.Draw(leaderboardGraphic)
         for ordinal in list(range(0, 3)):
             player = self.globalStats.getTopPlayer(ordinal + 1)
@@ -167,25 +170,4 @@ class LeaderboardCreator:
             xPos = offset + (LeaderboardCreator.__BOARD_SLATE_WIDTH - textWidth) / 2
             yPos = LeaderboardCreator.__BOARD_TITLE_HEIGHT
             draw.multiline_text((xPos, yPos), wrappedName, fill=(0, 0, 0, 255), font=fontTitle, align="center")
-
-    async def _addAvatar(self, canvas: Image.Image, player: PlayerOrdinal, offset: int):
-        # Get the player icon
-        avatar = None
-        if player.playerID > -1:
-            user = await self.bot.fetch_user(player.playerID)
-            if not user:
-                LeaderboardCreator.__LOGGER.log(LogLevel.LEVEL_WARN, f"Could not fetch user \"{player.name}\"({player.playerID})")
-            else:
-                player.name = user.display_name
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(user.display_avatar.url) as response:
-                        data = await response.read()
-                        avatar = Image.open(BytesIO(data)).convert("RGBA")
-
-        # Load default avatar if the player icon could not be retrieved for whatever reason
-        if not avatar:
-            avatar = Image.open(GLOBALVARS.IMAGE_MISSING_PLAYER_ICON).convert("RGBA")
-
-        avatar = avatar.resize((LeaderboardCreator.__AVATAR_SIZE, LeaderboardCreator.__AVATAR_SIZE))
-        canvas.paste(avatar, (offset, LeaderboardCreator.__AVATAR_YPOS), avatar)
 
