@@ -11,7 +11,7 @@ import textwrap
 
 from .IDiscordGraphical import IDiscordGraphical
 
-from PIL import Image, ImageFont, ImageDraw
+from PIL import Image, ImageDraw
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from config.Globals import GLOBALVARS
@@ -82,7 +82,14 @@ class LeaderboardCreator(IDiscordGraphical):
         for ordinal in list(range(0, 3)):
             player = self.globalStats.getTopPlayer(ordinal + 1)
             if player:
-                self._drawTitleName(draw, player, self.columnsOffsets[ordinal])
+                wrappedName = textwrap.fill(player.name,
+                                            width=LeaderboardCreator.__TITLE_CHAR_ROW_MAX,
+                                            break_long_words=True,
+                                            max_lines=LeaderboardCreator.__TITLE_ROWS_MAX)
+                self._drawTitleName(draw, wrappedName, self.fontName,
+                        fontSize=(LeaderboardCreator.__FONT_SIZE_TITLE, LeaderboardCreator.__FONT_SIZE_TITLE_MIN),
+                        pos=(self.columnsOffsets[ordinal], LeaderboardCreator.__BOARD_TITLE_HEIGHT),
+                        sizeMax=(LeaderboardCreator.__BOARD_SLATE_WIDTH, LeaderboardCreator.__TITLE_HEIGHT_MAX))
                 self._drawGamePoints(draw, player, self.columnsOffsets[ordinal])
 
         # TODO SCH If this works, redo the bingo card board images to use this method
@@ -97,12 +104,7 @@ class LeaderboardCreator(IDiscordGraphical):
     def _drawGamePoints(self, draw: ImageDraw.ImageDraw, player: PlayerOrdinal, offset: int):
         listCategory = ["Bingos", "Slots", "Games"]
         yOffset = LeaderboardCreator.__BOARD_POINTS_HEIGHT
-        try:
-            fontPoints = ImageFont.truetype(self.fontName, LeaderboardCreator.__FONT_SIZE_POINTS)
-        except Exception:
-            LeaderboardCreator.__LOGGER.log(LogLevel.LEVEL_ERROR,
-                                            f"Unable to load font \"{self.fontName}\", using PIL default.")
-            fontPoints = ImageFont.load_default()
+        fontPoints = self._getFont(self.fontName, LeaderboardCreator.__FONT_SIZE_POINTS)
 
         # Draw the bonus point descriptors
         for i, dType in enumerate(PersistentStats.LIST_DATA_ITEMS):
@@ -124,50 +126,10 @@ class LeaderboardCreator(IDiscordGraphical):
             yOffset += (textHeight + textHeight2 + LeaderboardCreator.__FONT_SPACER * 4)
 
         # Draw the points total
-        try:
-            fontPoints = ImageFont.truetype(self.fontName, LeaderboardCreator.__FONT_SIZE_POINTS + 20)
-        except Exception:
-            LeaderboardCreator.__LOGGER.log(LogLevel.LEVEL_ERROR,
-                                            f"Unable to load font \"{self.fontName}\", using PIL default.")
-            fontPoints = ImageFont.load_default()
+        fontPoints = self._getFont(self.fontName, LeaderboardCreator.__FONT_SIZE_POINTS + 20)
         descriptor = f"{player.points['total']} Pts"
         bbox = draw.textbbox((0, 0), descriptor, font=fontPoints)
         textWidth = bbox[2] - bbox[0]
         xPos = offset + (LeaderboardCreator.__BOARD_SLATE_WIDTH - textWidth) / 2
         draw.text((xPos, yOffset + LeaderboardCreator.__FONT_SPACER), descriptor, fill=(0, 0, 77, 255), font=fontPoints, align="center")
-
-    def _drawTitleName(self, draw: ImageDraw.ImageDraw, player: PlayerOrdinal, offset: int):
-        fontTitle = None
-        nameFits = False
-        textWidth = 0
-        titleSize = LeaderboardCreator.__FONT_SIZE_TITLE
-        wrappedName = textwrap.fill(player.name,
-                                    width=LeaderboardCreator.__TITLE_CHAR_ROW_MAX,
-                                    break_long_words=True,
-                                    max_lines=LeaderboardCreator.__TITLE_ROWS_MAX)
-
-        while not nameFits:
-            try:
-                fontTitle = ImageFont.truetype(self.fontName, titleSize)
-            except Exception:
-                LeaderboardCreator.__LOGGER.log(LogLevel.LEVEL_ERROR,
-                                                f"Unable to load font \"{self.fontName}\", using PIL default.")
-                fontTitle = ImageFont.load_default()
-            bbox = draw.multiline_textbbox((0, 0), wrappedName, font=fontTitle)
-            textWidth = bbox[2] - bbox[0]
-            textHeight = bbox[3] - bbox[1]
-
-            if textWidth <= LeaderboardCreator.__BOARD_SLATE_WIDTH and textHeight <= LeaderboardCreator.__TITLE_HEIGHT_MAX:
-                nameFits = True
-            else:
-                titleSize -= 2
-
-            # This shouldnt happen since textwrap should adequately truncate any name that is too long
-            if titleSize < LeaderboardCreator.__FONT_SIZE_TITLE_MIN:
-                LeaderboardCreator.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Player name too long \"{player.name}\", skipping name title")
-
-        if nameFits:
-            xPos = offset + (LeaderboardCreator.__BOARD_SLATE_WIDTH - textWidth) / 2
-            yPos = LeaderboardCreator.__BOARD_TITLE_HEIGHT
-            draw.multiline_text((xPos, yPos), wrappedName, fill=(0, 0, 0, 255), font=fontTitle, align="center")
 

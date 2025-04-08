@@ -9,19 +9,26 @@ __email__ = "--"
 import aiohttp
 import discord
 
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from abc import ABC, abstractmethod
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Globals import GLOBALVARS
 from game.PersistentStats import PlayerOrdinal
 from io import BytesIO
+from typing import Tuple, Union
 
+Coord = Tuple[int, int]
+Size = Tuple[int, int]
 class IDiscordGraphical(ABC):
     __LOGGER = ClassLogger(__name__)
 
     def __init__(self, bot: discord.Client):
         super().__init__()
         self.bot = bot
+
+    @abstractmethod
+    async def createAsset(self) -> discord.File:
+        pass
 
     async def _getDiscordAvatar(self, playerOrd: PlayerOrdinal, avatarSize: int) -> Image.Image:
         avatar = None
@@ -42,7 +49,39 @@ class IDiscordGraphical(ABC):
 
         return avatar.resize((avatarSize, avatarSize))
 
-    @abstractmethod
-    async def createAsset(self) -> discord.File:
-        pass
+    def _drawTitleName(self, draw: ImageDraw.ImageDraw, titleName: str, fontName: str, fontSize: Size, pos: Coord, sizeMax: Size):
+        fontTitle = None
+        nameFits = False
+        textWidth = 0
+        titleSize = fontSize[0]
+
+        while not nameFits:
+            fontTitle = self._getFont(fontName, titleSize)
+            bbox = draw.multiline_textbbox((0, 0), titleName, font=fontTitle)
+            textWidth = bbox[2] - bbox[0]
+            textHeight = bbox[3] - bbox[1]
+
+            nameFits = textWidth <= sizeMax[0] and textHeight <= sizeMax[1]
+            if not nameFits:
+                titleSize -= 2
+
+            if titleSize < fontSize[1]:
+                IDiscordGraphical.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Player name too long \"{titleName}\", skipping name title.")
+                break
+
+        print(f"Using font size: {titleSize}")
+        if nameFits:
+            xPos = pos[0] + (sizeMax[0] - textWidth) / 2
+            yPos = pos[1]
+            draw.multiline_text((xPos, yPos), titleName, fill=(0, 0, 0, 255), font=fontTitle, align="center")
+
+    def _getFont(self, fontName, fontSize) -> Union[ImageFont.FreeTypeFont, ImageFont.ImageFont]:
+            try:
+                font = ImageFont.truetype(fontName, fontSize)
+            except Exception:
+                IDiscordGraphical.__LOGGER.log(LogLevel.LEVEL_ERROR,
+                                            f"Unable to load font \"{fontName}\", using PIL default.")
+                font = ImageFont.load_default()
+
+            return font
 
