@@ -16,8 +16,14 @@ from .RankImgCreator import RankImgCreator
 from config.ClassLogger import ClassLogger, LogLevel
 from discord.app_commands.commands import Command
 from game.GameStore import GameStore
-from game.PersistentStats import PersistentStats, PlayerOrdinal
+from game.PersistentStats import PersistentStats
 from typing import Optional, cast
+
+ScoreChoices = [
+    discord.app_commands.Choice(name="All-time", value=PersistentStats.ITEM_TOTAL),
+    discord.app_commands.Choice(name="Monthly", value=PersistentStats.ITEM_MONTH),
+    discord.app_commands.Choice(name="Weekly", value=PersistentStats.ITEM_WEEK)
+]
 
 class PlayerCommandHandler(ICommandHandler):
     __LOGGER = ClassLogger(__name__)
@@ -70,7 +76,9 @@ class PlayerCommandHandler(ICommandHandler):
     async def stats(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
         pass
 
-    async def leaderboard(self, interaction: discord.Interaction):
+    @discord.app_commands.describe(group="Leaderboard class type. Default = All-time")
+    @discord.app_commands.choices(color=ScoreChoices)
+    async def leaderboard(self, interaction: discord.Interaction, group: Optional[str]):
         pass
 
     async def _getGuild(self, interaction: discord.Interaction) -> Optional[GameGuild]:

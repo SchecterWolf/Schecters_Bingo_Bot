@@ -24,9 +24,16 @@ class RankImgCreator(IDiscordGraphical):
 
     __AVATAR_SIZE = 325
 
+    __COLOR_1ST = (204, 150, 0)
+    __COLOR_2ND = (145, 159, 163)
+    __COLOR_3RD = (196, 118, 59)
+    __COLOR_RANK_ALL_TIME = (31, 0, 0)
+    __COLOR_RANK_MONTHLY = (0, 0, 31)
+    __COLOR_RANK_WEEKLY = (0, 26, 0)
+
+    __BOARD_TITLE_HEIGHT = 150
     __BOARD_TITLE_WIDTH = 750
 
-    __DESC_BUF = 40
     __DESC_LINE_LEN = 240
     __DESC_WIDTH = 250
 
@@ -85,33 +92,36 @@ class RankImgCreator(IDiscordGraphical):
 
         # Add name title
         draw = ImageDraw.Draw(rankGraphic)
-        wrappedName = textwrap.fill(self.playerOrd.name, max_lines=1, width=RankImgCreator.__TITLE_CHAR_ROW_MAX)
+        wrappedName = textwrap.fill(self.playerOrd.name, max_lines=2, width=RankImgCreator.__TITLE_CHAR_ROW_MAX)
         self._drawTitleName(draw, wrappedName, self.fontName,
                 fontSize=(RankImgCreator.__FONT_SIZE_TITLE, RankImgCreator.__FONT_SIZE_TITLE_MIN),
                 pos=(RankImgCreator.__XPOS_TITLE, RankImgCreator.__YPOS_TITLE),
-                sizeMax=(RankImgCreator.__BOARD_TITLE_WIDTH, RankImgCreator.__BOARD_TITLE_WIDTH))
+                sizeMax=(RankImgCreator.__BOARD_TITLE_WIDTH, RankImgCreator.__BOARD_TITLE_HEIGHT))
 
         # Add the ranking text
         self._drawAllTimeRank(self.playerOrd, draw)
         self._drawRank(self.playerOrd, draw)
 
-        with BytesIO() as imageData:
-            rankGraphic.save(imageData, "PNG")
-            imageData.seek(0)
-            file = discord.File(imageData, "rank.png")
-
-        return file
+        return self._convertFile(rankGraphic, "rank.png")
 
     def _drawAllTimeRank(self, playerOrd: PlayerOrdinal, draw: ImageDraw.ImageDraw):
-        rankStr = f"Rank\n{playerOrd.ranks[PersistentStats.ITEM_TOTAL]}"
+        rankNum = playerOrd.ranks[PersistentStats.ITEM_TOTAL]
+        rankStr = f"Rank\n{rankNum}"
+        allTimeColor = {
+            1: RankImgCreator.__COLOR_1ST,
+            2: RankImgCreator.__COLOR_2ND,
+            3: RankImgCreator.__COLOR_3RD
+        }
         fontRank = self._getFont(self.fontName, RankImgCreator.__FONT_SIZE_RANK_TOP)
+
         bbox = draw.multiline_textbbox((0, 0), rankStr, fontRank)
         textWidth = bbox[2] - bbox[0]
         textHeight = bbox[3] - bbox[1]
-        trophyOffset = 50 if playerOrd.ranks[PersistentStats.ITEM_TOTAL] <= 3 else 0
+        trophyOffset = 50 if rankNum <= 3 else 0
         xPos = RankImgCreator.__XPOS_RANK + (RankImgCreator.__RANK_WIDTH - textWidth) / 2
         yPos = RankImgCreator.__YPOS_RANK + (RankImgCreator.__RANK_WIDTH - textHeight) / 2 - trophyOffset
-        draw.multiline_text((xPos, yPos), rankStr, fill=(0, 0, 0, 255), font=fontRank, align="center")
+
+        draw.multiline_text((xPos, yPos), rankStr, fill=allTimeColor.get(rankNum, (0, 0, 0, 255)), font=fontRank, align="center")
 
     def _drawRank(self, playerOrd: PlayerOrdinal,  draw: ImageDraw.ImageDraw):
         fontRank = self._getFont(self.fontName, RankImgCreator.__FONT_SIZE_DESC)
@@ -120,24 +130,28 @@ class RankImgCreator(IDiscordGraphical):
             PersistentStats.ITEM_MONTH: "Monthly",
             PersistentStats.ITEM_WEEK: "Weekly",
         }
-
-        # TODO SCH rm
-        draw.line([(RankImgCreator.__XPOS_DESC, RankImgCreator.__YPOS_DESC), (RankImgCreator.__XPOS_DESC + RankImgCreator.__DESC_WIDTH, RankImgCreator.__YPOS_DESC)], fill='black', width=6)
+        rankColors = {
+            PersistentStats.ITEM_TOTAL: RankImgCreator.__COLOR_RANK_ALL_TIME,
+            PersistentStats.ITEM_MONTH: RankImgCreator.__COLOR_RANK_MONTHLY,
+            PersistentStats.ITEM_WEEK: RankImgCreator.__COLOR_RANK_WEEKLY
+        }
 
         offset = RankImgCreator.__XPOS_DESC
         for cType in PersistentStats.LIST_CATEGORY_ITEMS:
             # Draw the rank type text
-            rankStr = f"{rankTitle[cType]}\n{playerOrd.points[cType]} Pts\n\n\nRank {playerOrd.ranks[cType]}"
+            rankStr = f"{rankTitle[cType]}\n\n{playerOrd.points[cType]} Pts\n\nRank {playerOrd.ranks[cType]}"
             bbox = draw.multiline_textbbox((0, 0), rankStr, fontRank)
             textWidth = bbox[2] - bbox[0]
-            draw.multiline_text((offset, RankImgCreator.__YPOS_DESC), rankStr, fill=(0, 0, 0, 255), font=fontRank, align="left")
+            xPos = offset + (RankImgCreator.__DESC_WIDTH - textWidth) / 2
+            yPos = RankImgCreator.__YPOS_DESC
+            draw.multiline_text((xPos, yPos), rankStr, fill=rankColors[cType], font=fontRank, align="center")
 
             # Draw rank line divider
             if cType != PersistentStats.ITEM_WEEK:
-                xPos = offset + textWidth + RankImgCreator.__DESC_BUF
+                xPos = offset + RankImgCreator.__DESC_WIDTH
                 yPos = RankImgCreator.__YPOS_DESC
                 yPos2 = RankImgCreator.__YPOS_DESC + RankImgCreator.__DESC_LINE_LEN
                 draw.line([(xPos, yPos), (xPos, yPos2)], fill='black', width=6)
 
-            offset += textWidth + RankImgCreator.__DESC_BUF * 2
+            offset += RankImgCreator.__DESC_WIDTH
 

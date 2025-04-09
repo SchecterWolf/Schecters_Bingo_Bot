@@ -16,7 +16,6 @@ from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from config.Globals import GLOBALVARS
 from game.PersistentStats import PersistentStats, PlayerOrdinal
-from io import BytesIO
 
 class LeaderboardCreator(IDiscordGraphical):
     __LOGGER = ClassLogger(__name__)
@@ -92,14 +91,7 @@ class LeaderboardCreator(IDiscordGraphical):
                         sizeMax=(LeaderboardCreator.__BOARD_SLATE_WIDTH, LeaderboardCreator.__TITLE_HEIGHT_MAX))
                 self._drawGamePoints(draw, player, self.columnsOffsets[ordinal])
 
-        # TODO SCH If this works, redo the bingo card board images to use this method
-        # Create a discord file from the leaderboard image
-        with BytesIO() as imageData:
-            leaderboardGraphic.save(imageData, "PNG")
-            imageData.seek(0)
-            file = discord.File(imageData, "leaderboard.png")
-
-        return file
+        return self._convertFile(leaderboardGraphic, "leaderboard.png")
 
     def _drawGamePoints(self, draw: ImageDraw.ImageDraw, player: PlayerOrdinal, offset: int):
         listCategory = ["Bingos", "Slots", "Games"]

@@ -131,6 +131,14 @@ class PersistentStats():
                 break
         return ret
 
+    def getCanonicalCType(self, cType: str) -> str:
+        typeCanon = {
+            PersistentStats.ITEM_TOTAL: "All-time",
+            PersistentStats.ITEM_MONTH: "Monthly",
+            PersistentStats.ITEM_WEEK: "Weekly"
+        }
+        return typeCanon.get(cType, "")
+
     def _readInPlayerData(self):
         PersistentStats.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Reading in saved player data...")
         if self.filePlayerData.exists():

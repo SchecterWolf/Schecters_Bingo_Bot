@@ -53,6 +53,7 @@ class IDiscordGraphical(ABC):
         fontTitle = None
         nameFits = False
         textWidth = 0
+        textHeight = 0
         titleSize = fontSize[0]
 
         while not nameFits:
@@ -66,14 +67,22 @@ class IDiscordGraphical(ABC):
                 titleSize -= 2
 
             if titleSize < fontSize[1]:
-                IDiscordGraphical.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Player name too long \"{titleName}\", skipping name title.")
+                IDiscordGraphical.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Title too long \"{titleName}\", skipping drawing title.")
                 break
 
-        print(f"Using font size: {titleSize}")
         if nameFits:
             xPos = pos[0] + (sizeMax[0] - textWidth) / 2
-            yPos = pos[1]
+            yPos = pos[1] + (sizeMax[1] - textHeight) / 2
             draw.multiline_text((xPos, yPos), titleName, fill=(0, 0, 0, 255), font=fontTitle, align="center")
+
+    def _convertFile(self, image: Image.Image, name: str) -> discord.File:
+        # TODO SCH If this works, redo the bingo card board images to use this method
+        # Create a discord file from the leaderboard image
+        with BytesIO() as imageData:
+            image.save(imageData, "PNG")
+            imageData.seek(0)
+            file = discord.File(imageData, name)
+        return file
 
     def _getFont(self, fontName, fontSize) -> Union[ImageFont.FreeTypeFont, ImageFont.ImageFont]:
             try:
