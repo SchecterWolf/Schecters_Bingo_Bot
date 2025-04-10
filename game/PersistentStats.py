@@ -131,6 +131,9 @@ class PersistentStats():
                 break
         return ret
 
+    def getAllPlayers(self, cType: str) -> Deque[PlayerOrdinal]:
+        return self.topPlayers.get(cType, Deque())
+
     def getCanonicalCType(self, cType: str) -> str:
         typeCanon = {
             PersistentStats.ITEM_TOTAL: "All-time",

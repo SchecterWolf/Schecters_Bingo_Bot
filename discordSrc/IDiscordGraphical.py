@@ -84,7 +84,7 @@ class IDiscordGraphical(ABC):
             file = discord.File(imageData, name)
         return file
 
-    def _getFont(self, fontName, fontSize) -> Union[ImageFont.FreeTypeFont, ImageFont.ImageFont]:
+    def _getFont(self, fontName: str, fontSize: int) -> Union[ImageFont.FreeTypeFont, ImageFont.ImageFont]:
             try:
                 font = ImageFont.truetype(fontName, fontSize)
             except Exception:
