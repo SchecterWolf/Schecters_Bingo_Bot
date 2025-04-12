@@ -16,11 +16,32 @@ from config.Config import Config
 from config.Globals import GLOBALVARS
 from game.SavedData import SavedData
 from pathlib import Path
-from typing import Deque, Dict, List, Union, cast
+from typing import Deque, Dict, List, Optional, Union, cast
 
 TypeDataStat = Dict[str, int]
 TypePlayerData = Dict[str, Union[str, TypeDataStat]]
 TypePlayerEntry = Dict[str, TypePlayerData]
+
+# TODO This isn't a good practice to define the keys like this, since it diverges from the
+#       "single source-of-truth" in the PersistentStats... But I cant forward declare in
+#       python, so I'm just redefining the keys
+BONUSES: Dict[str, int] = {
+    "bingos": Config().getConfig("BonusBingo", 1),
+    "calls": Config().getConfig("BonusSlotsCalled", 1),
+    "games": Config().getConfig("BonusGamesPlayed", 1)
+}
+
+def GetBonus(dType: str) -> int:
+    return BONUSES.get(dType, 0)
+
+def CanonicalCType(cType: str) -> str:
+    typeCanon = {
+        PersistentStats.ITEM_TOTAL: "All-time",
+        PersistentStats.ITEM_MONTH: "Monthly",
+        PersistentStats.ITEM_WEEK: "Weekly"
+    }
+    return typeCanon.get(cType, "")
+
 
 class PlayerOrdinal:
     def __init__(self, playerID: int, name: str = "", ):
@@ -28,14 +49,15 @@ class PlayerOrdinal:
         self.name = name
 
         self.stats: dict[str, TypeDataStat] = {}
+        self.points: dict[str, int] = {}
+        self.ranks: dict[str, int] = {}
+
         for cType in PersistentStats.LIST_CATEGORY_ITEMS:
             self.stats[cType] = {}
+            self.points[cType] = 0
+            self.ranks[cType] = 0
             for dType in PersistentStats.LIST_DATA_ITEMS:
                 self.stats[cType][dType] = 0
-
-        self.points: dict[str, int] = {}
-        for cType in PersistentStats.LIST_CATEGORY_ITEMS:
-            self.points[cType] = 0
 
 class PersistentStats():
     __LOGGER = ClassLogger(__name__)
@@ -53,14 +75,7 @@ class PersistentStats():
     LIST_CATEGORY_ITEMS = [ITEM_TOTAL, ITEM_MONTH, ITEM_WEEK]
 
     def __init__(self):
-        cfg = Config()
-        self.bonuses: dict[str, int] = {
-            PersistentStats.DATA_ITEM_BINGOS: cfg.getConfig("BonusBingo", 1),
-            PersistentStats.DATA_ITEM_CALLS: cfg.getConfig("BonusSlotsCalled", 1),
-            PersistentStats.DATA_ITEM_GAMES: cfg.getConfig("BonusGamesPlayed", 1)
-        }
-
-        self.topPlayers: dict[str, Deque] = {
+        self.topPlayers: dict[str, Deque[PlayerOrdinal]] = {
             PersistentStats.ITEM_TOTAL: Deque(),
             PersistentStats.ITEM_MONTH: Deque(),
             PersistentStats.ITEM_WEEK: Deque(),
@@ -112,15 +127,23 @@ class PersistentStats():
             self._loadPlayerData()
             self._save()
 
-    def getBonus(self, bType: str) -> int:
-        return self.bonuses.get(bType, 0)
-
-    def getTopPlayer(self, place: int, category: str = ITEM_TOTAL) -> Union[PlayerOrdinal, None]:
+    def getTopPlayer(self, place: int, category: str = ITEM_TOTAL) -> Optional[PlayerOrdinal]:
         ret = None
         leaderboard = self.topPlayers.get(category)
         if leaderboard and place - 1 < len(leaderboard):
             ret = leaderboard[place -1]
         return ret
+
+    def getPlayer(self, playerID: int) -> Optional[PlayerOrdinal]:
+        ret = None
+        for player in self.topPlayers.get(PersistentStats.ITEM_TOTAL) or []:
+            if playerID == player.playerID:
+                ret = player
+                break
+        return ret
+
+    def getAllPlayers(self, cType: str) -> Deque[PlayerOrdinal]:
+        return self.topPlayers.get(cType, Deque())
 
     def _readInPlayerData(self):
         PersistentStats.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Reading in saved player data...")
@@ -144,9 +167,9 @@ class PersistentStats():
         for key, val in self.playerData.items():
             playerID: int = int(key)
             name: str = cast(str, val[PersistentStats.ITEM_NAME])
-            for cType in PersistentStats.LIST_CATEGORY_ITEMS:
-                player = PlayerOrdinal(playerID, name)
+            player = PlayerOrdinal(playerID, name)
 
+            for cType in PersistentStats.LIST_CATEGORY_ITEMS:
                 # Null out the month/week stats if we're currently elapsed
                 stats:TypeDataStat = cast(TypeDataStat, val[cType])
                 if (cType == PersistentStats.ITEM_MONTH and currentMonthID > savedMonthID)\
@@ -154,11 +177,19 @@ class PersistentStats():
                     stats = cast(TypeDataStat, self._getPlayerStats(-1)[cType])
                 self._processStats(player, cType, stats)
 
+        # Set player rank value
+        for cType in PersistentStats.LIST_CATEGORY_ITEMS:
+            for idx, player in enumerate(self.topPlayers[cType]):
+                if player.points[cType] > 0:
+                    player.ranks[cType] = idx + 1
+                else:
+                    player.ranks[cType] = 0
+
     def _processStats(self, player: PlayerOrdinal, cType: str, stats: TypeDataStat):
         for dType in PersistentStats.LIST_DATA_ITEMS:
             val = stats.get(dType, 0)
             player.stats[cType][dType] = val
-            player.points[cType] += val * self.bonuses[dType]
+            player.points[cType] += val * GetBonus(dType)
 
         leaderboard = self.topPlayers[cType]
         if not leaderboard:
@@ -171,9 +202,6 @@ class PersistentStats():
                 break
             idx = index + 1
         leaderboard.insert(idx, player)
-
-        if len(self.topPlayers) > 3:
-            leaderboard.pop()
 
     def _getPlayerStats(self, playerID: int) -> TypePlayerData:
         ret: dict = self.playerData.get(str(playerID), dict())

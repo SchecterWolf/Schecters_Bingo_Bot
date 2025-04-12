@@ -16,14 +16,14 @@ from config.Log import LogLevel
 
 from game.Player import Player
 from queue import Queue
-from typing import Union
+from typing import Optional
 
 # For now we just have one task that this processor can handle,
 # But is we end up with more, break this out into their own classes
 class TaskUpdateUserDMs:
     __LOGGER = ClassLogger(__name__)
 
-    def __init__(self, notifStr: str, player: Union[Player, None]):
+    def __init__(self, notifStr: str, player: Optional[Player]):
         self.notifStr = notifStr
         self.player = player
 

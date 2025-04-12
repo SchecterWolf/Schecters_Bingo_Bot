@@ -17,7 +17,7 @@ from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import GLOBALVARS
 from game.GameStore import GameStore
 from game.IGameInterface import IGameInterface
-from game.PersistentStats import PlayerOrdinal, PersistentStats
+from game.PersistentStats import PlayerOrdinal, PersistentStats, GetBonus
 from typing import Deque, List, cast
 
 class GameStatusEmbed(Embed):
@@ -64,8 +64,8 @@ class GameStatusEmbed(Embed):
         players = iface.game.getAllPlayers()
         topPlayers: Deque[PlayerOrdinal] = Deque()
 
-        bingoBonus = iface.gameGuild.persistentStats.getBonus(PersistentStats.DATA_ITEM_BINGOS)
-        callBonus = iface.gameGuild.persistentStats.getBonus(PersistentStats.DATA_ITEM_CALLS)
+        bingoBonus = GetBonus(PersistentStats.DATA_ITEM_BINGOS)
+        callBonus = GetBonus(PersistentStats.DATA_ITEM_CALLS)
 
         # Top player title
         self.add_field(name=GameStatusEmbed.__FIELD_TOP_PLAYERS, value="\u00A0", inline=False)

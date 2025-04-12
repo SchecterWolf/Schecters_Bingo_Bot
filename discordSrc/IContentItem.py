@@ -6,7 +6,10 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
-class IContentItem:
+from abc import ABC
+
+class IContentItem(ABC):
     def __init__(self, msgStr: str):
+        super().__init__()
         self.msgStr = msgStr
 

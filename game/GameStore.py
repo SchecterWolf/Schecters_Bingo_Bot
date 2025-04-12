@@ -9,12 +9,12 @@ __email__ = "--"
 from .IGameController import IGameController
 from .IGameInterface import IGameInterface
 
-from typing import Dict, Union
+from typing import Dict, Optional
 
 class GameStore:
     __instance = None
     __games: Dict[int, IGameInterface] = dict()
-    __controller: Union[None, IGameController] = None
+    __controller: Optional[IGameController] = None
 
     def __new__(cls, *args, **kwargs):
         if not cls.__instance:
@@ -25,7 +25,7 @@ class GameStore:
         if not GameStore.__controller:
             GameStore.__controller = controller
 
-    def getController(self) -> Union[None, IGameController]:
+    def getController(self) -> Optional[IGameController]:
         return GameStore.__controller
 
     def addGame(self, gameID: int, game: IGameInterface) -> bool:
@@ -34,7 +34,7 @@ class GameStore:
         GameStore.__games[gameID] = game
         return True
 
-    def getGame(self, gameID: int) -> Union[None, IGameInterface]:
+    def getGame(self, gameID: int) -> Optional[IGameInterface]:
         return GameStore.__games.get(gameID)
 
     def removeGame(self, gameID: int):
