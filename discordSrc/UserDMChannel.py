@@ -68,10 +68,11 @@ class UserDMChannel(IChannelInterface):
 
     async def setBoardView(self):
         UserDMChannel.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Updating player card for player \"{self.player.card.getCardOwner()}\"")
+        filename = f"board_{self.player.userID}.png"
         embed = discord.Embed(title="Max Livestream Bingo Card", color=discord.Color.green())
-        self.cardFile, cardName = CardImgCreator().createGraphicalCard(self.player.card)
-        file = discord.File(self.cardFile, filename=cardName)
-        embed.set_image(url=f"attachment://{cardName}")
+        file = discord.File(CardImgCreator().createGraphicalCard(self.player.card), filename)
+
+        embed.set_image(url=f"attachment://{filename}")
 
         if not self._hasChannelItem(UserDMChannel.__MSG_BINGO_BOARD):
             await self._updateChannelItem(UserDMChannel.__MSG_BINGO_BOARD, file=file, embed=embed)

@@ -94,9 +94,7 @@ class AdminCommandHandler(ICommandHandler):
         else:
             BannedData().addBanned(member.id, member.display_name)
             gameController = GameStore().getController()
-            guild: Optional[GameGuild] = None
-            if gameController:
-                guild = cast(GameControllerDiscord, gameController).getGuild(guildID)
+            guild: Optional[GameGuild] = cast(GameControllerDiscord, gameController).getGuild(guildID) if gameController else None
             if guild:
                 guild.persistentStats.removePlayer(member.id)
 
@@ -113,9 +111,80 @@ class AdminCommandHandler(ICommandHandler):
 
     @discord.app_commands.checks.has_role(Config().getConfig("GameMasterRole"))
     async def gameStatus(self, interaction: discord.Interaction):
-        # TODO SCH
-        await interaction.response.defer()
-        pass
+        # Make sure the game instance exists
+        iface = GameStore().getGame(interaction.guild_id or -1)
+        if not iface:
+            gName = interaction.guild.name if interaction.guild else "N/A"
+            await interaction.response.send_message(f"\U0000274C There is no active game for server {gName}", ephemeral=True)
+            return
+
+        text = ""
+        guildID = interaction.guild_id or -1
+        gameController = GameStore().getController()
+        guild: Optional[GameGuild] = cast(GameControllerDiscord, gameController).getGuild(guildID) if gameController else None
+
+        # Game duration
+        hours = int(iface.game.timeStarted // 3600)
+        minutes = int((iface.game.timeStarted % 3600) // 60)
+        seconds = int(iface.game.timeStarted % 60)
+        text += f"Game elapsed time: {hours:02d},{minutes:02d},{seconds:02d}"
+
+        # Num players
+        text += f"\n\nCurrent players (with slot counts): "
+        playerNames = []
+        for player in iface.game.getAllPlayers():
+            playerNames.append(f"{player.card.getCardOwner()}({player.card.getNumMarked()})")
+        text += ", ".join(playerNames)
+
+        # Kicked players
+        if guild:
+            text += f"\n\nKicked players: "
+            kickedNames = []
+            for playerID in iface.game.getKickedPlayers():
+                player = guild.persistentStats.getPlayer(playerID)
+                if player:
+                    kickedNames.append(player.name)
+            if kickedNames:
+                text += ", ".join(kickedNames)
+            else:
+                text += "NONE"
+
+        # Banned players
+        if guild:
+            text += f"\n\nBanned players:"
+            bannedNamed = []
+            for playerID in iface.game.bannedPlayers.getAllBanned():
+                player = guild.persistentStats.getPlayer(playerID)
+                if player:
+                    bannedNamed.append(player.name)
+            if bannedNamed:
+                text += ", ".join(bannedNamed)
+            else:
+                text += "NONE"
+
+        # Bingos
+        text += "\n\nPlayer bingos: " + ", ".join(iface.game.getPlayerBingos())
+
+        # Slot requests
+        text += "\n\nSlot requests (with num requested): "
+        reqNames = []
+        for req in iface.game.requestedCalls:
+            reqNames.append(f"{req.requestBing.bingStr}({len(req.players)})")
+        if reqNames:
+            text += ", ".join(reqNames)
+        else:
+            text += "NONE"
+
+
+        # Called slots
+        text += "\n\nCalled slots: "
+        calledSlots = []
+        for call in iface.game.getCalls():
+            calledSlots.append(call.bingStr)
+        if calledSlots:
+            text += ", ".join(calledSlots)
+        else:
+            text += "NONE"
 
     async def _checkBotMember(self, interaction: discord.Interaction, member: discord.Member) -> bool:
         """

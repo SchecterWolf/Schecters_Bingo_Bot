@@ -74,7 +74,6 @@ class TaskProcessor:
         self.running = False
         self.taskQueue.put(TaskUpdateUserDMs("", None)) # Unblock the processor thread
         self.processorThread.join()
-        TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Task processor signaled to shut down.") # TODO SCH rm
 
     # Adds a task to the process queue only if a task of the same type isnt already queued
     def addTask(self, task: TaskUpdateUserDMs):

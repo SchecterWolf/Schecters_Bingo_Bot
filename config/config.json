@@ -9,6 +9,7 @@
     "FontSmall": "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf",
     "GameMasterRole": "GameMaster",
     "LogLevel": "debug",
+    "MaxRequests": 2,
     "Mode": "discord",
     "RetroactiveCalls": true,
     "StreamerName": "Max",

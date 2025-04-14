@@ -16,7 +16,8 @@ from config.Globals import GLOBALVARS
 from config.Log import LogLevel
 
 from game.Card import Card
-from typing import List, Tuple
+from io import BytesIO
+from typing import List
 
 class CardImgCreator:
     __BG_BOARDER = 30
@@ -25,7 +26,7 @@ class CardImgCreator:
     __SIZE_LINE_WDTH = 2
     __SIZE_TEXT = 20
 
-    def createGraphicalCard(self, card: Card) -> Tuple[str, str]:
+    def createGraphicalCard(self, card: Card) -> BytesIO:
         gridOverlay = self._createGridOverlay(card)
         gridWidth, gridHeight = gridOverlay.size
         background = Image.open(GLOBALVARS.IMAGE_CARD_BG).convert("RGBA")
@@ -36,12 +37,12 @@ class CardImgCreator:
         # Composite the grid over the background layer
         background.paste(gridOverlay, (int(CardImgCreator.__BG_BOARDER / 2), int(CardImgCreator.__BG_BOARDER / 2)), mask=gridOverlay)
 
-        # Save to the file system, since the discord API requires it
-        cardName = f"{card.getCardOwner()}.png"
-        cardFile = f"{GLOBALVARS.DIR_CARD_IMAGES}/{cardName}"
-        background.save(cardFile, format="PNG")
+        # Save the image to an io stream
+        ret = BytesIO()
+        background.save(ret, format="PNG")
+        ret.seek(0)
 
-        return cardFile, cardName
+        return ret
 
     def _createGridOverlay(self, card: Card) -> Image.Image:
         cellStrs: List[List[str]] = self._getCellStrs(card)

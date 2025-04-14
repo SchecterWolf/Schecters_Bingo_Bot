@@ -12,7 +12,7 @@ import time
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Globals import GLOBALVARS
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 TypeBannedData = Dict[str, str]
 TypeBannedPlayer = Dict[str, TypeBannedData]
@@ -66,6 +66,9 @@ class BannedData:
             BannedData.__LOGGER.log(LogLevel.LEVEL_INFO, f"Player ID {playerID} has been removed from the banned list.")
             del self.data[str(playerID)]
             self.flush()
+
+    def getAllBanned(self) -> List[int]:
+        return [int(playerID) for playerID in self.data.keys()]
 
     def _loadData(self):
         if not self.bannedFile.exists():

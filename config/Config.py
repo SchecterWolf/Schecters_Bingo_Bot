@@ -21,7 +21,7 @@ class Config:
             cls.__instance = super().__new__(cls, *args, **kwargs)
         return cls.__instance
 
-    def getConfig(self, configStr: str, default: Any = ""):
+    def getConfig(self, configStr: str, default: Any = "") -> Any:
         if not self.__config:
             with open(GLOBALVARS.FILE_CONFIG_GENERAL, 'r') as file:
                 self.__config = json.load(file)

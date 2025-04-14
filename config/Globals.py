@@ -12,7 +12,6 @@ class GLOBALVARS:
     PROJ_ROOT = str(Path(__file__).parent.parent)
 
     DIR_RESOURCES = PROJ_ROOT + "/resources"
-    DIR_CARD_IMAGES = DIR_RESOURCES + "/cards"
     DIR_DATA = DIR_RESOURCES + "/data"
 
     FILE_CONFIG_GENERAL = PROJ_ROOT + "/config/config.json"

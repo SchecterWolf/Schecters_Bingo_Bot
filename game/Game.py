@@ -6,6 +6,8 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
+import time
+
 from .BannedData import BannedData
 from .Bing import Bing
 from .Binglets import Binglets
@@ -39,10 +41,11 @@ class Game:
     }
 
     def __init__(self):
-        self.config: Config = Config()
         self.bannedPlayers = BannedData()
+        self.config: Config = Config()
         self.persistentStats: Optional[PersistentStats] = None
         self.state: GameState = GameState.NEW
+        self.timeStarted = time.time()
 
         self.calledBings: Set[Bing] = set()
         self.kickedPlayers: Set[int] = set()
@@ -349,11 +352,22 @@ class Game:
     def getAllPlayers(self) -> List[Player]:
         return list(self.players)
 
+    def getKickedPlayers(self) -> List[int]:
+        return list(self.kickedPlayers)
+
     def getPlayerBingos(self) -> List[str]:
         return list(self.playerBingos)
 
     def getCalls(self) -> List[Bing]:
         return list(self.calledBings)
+
+    def getNumRequestByPlayer(self, player: Player) -> int:
+        numReq = 0
+
+        for req in self.requestedCalls:
+            numReq += 1 if player in req.players else 0
+
+        return numReq
 
     def checkEligible(self, player: Union[Player, int]) -> Result:
         ret = Result(False)

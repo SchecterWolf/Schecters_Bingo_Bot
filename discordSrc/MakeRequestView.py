@@ -9,8 +9,8 @@ __email__ = "--"
 import discord
 
 from .IContentItem import IContentItem
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
+from config.Config import Config
 from discord.ui import Select, View
 from game.ActionData import ActionData
 from game.Bing import Bing
@@ -41,15 +41,20 @@ class MakeRequestView(View, IContentItem):
 
         game = GameStore().getGame(self.gameID)
         requestBing = self._player.card.getBingFromID(int(self.select.values[0]))
-        if not requestBing:
+        maxRequestsLimit = Config().getConfig("MaxRequests", 0)
+
+        if not game:
+            await interaction.response.send_message(f"Failed to process request", ephemeral=True)
+        elif not requestBing:
             errStr = "Requested call category does not exist in this players card, aborting."
             MakeRequestView.__LOGGER.log(LogLevel.LEVEL_ERROR, errStr)
             await interaction.response.send_message(errStr, ephemeral=True)
         elif requestBing.marked:
             await interaction.response.send_message(f"Slot \"{requestBing.bingStr}\" has already been marked!.", ephemeral=True)
+        elif game.game.getNumRequestByPlayer(self._player) >= maxRequestsLimit:
+            await interaction.response.send_message(f"\U0001F6D1 Request limit reached! You can only request up to {maxRequestsLimit} requests at a time.")
         else:
             await interaction.response.defer()
-            # TODO SCH I need to limit this per player to 2 max
             if game:
                 _ = game.requestCall(ActionData(interaction=interaction, callRequest=CallRequest(self._player, requestBing)))
 
