@@ -18,10 +18,9 @@ from .PersistentStats import PersistentStats
 from .Player import Player
 from .Result import Result
 
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 
-from typing import cast
+from typing import Optional, cast
 
 class GameInterfaceCLI(IGameInterface):
     """
@@ -65,20 +64,21 @@ class GameInterfaceCLI(IGameInterface):
         ret = self.game.stopGame()
         print(ret.responseMsg)
 
-    def pause(self):
+    def pause(self, _: ActionData):
         pass
 
-    def resume(self):
+    def resume(self, _: ActionData):
         pass
 
-    def requestCall(self):
+    def requestCall(self, _: ActionData):
         pass
 
-    def deleteRequest(self):
+    def deleteRequest(self, _: ActionData):
         pass
 
-    def addPlayer(self, command):
+    def addPlayer(self, data: ActionData):
         self._logger.log(LogLevel.LEVEL_DEBUG, "AddPlayer command called")
+        command: str = data.get("command")
 
         # Get name from args
         parser = argparse.ArgumentParser(prog="AddPlayer", add_help=False)
@@ -97,10 +97,11 @@ class GameInterfaceCLI(IGameInterface):
         return self.game.kickPlayer(data.get("playerID"))
 
     def banPlayer(self, data: ActionData) -> Result:
-        return self.game.banPlayer(data.get("playerID"))
+        return self.game.banPlayer(data.get("playerID"), data.get("playerName"))
 
-    def makeCall(self, command):
+    def makeCall(self, data: ActionData):
         self._logger.log(LogLevel.LEVEL_DEBUG, "MakeCall command called")
+        command: str =  data.get("command")
         result = Result(False)
 
         parser = argparse.ArgumentParser(prog="MakeCall", add_help=False)
@@ -136,14 +137,13 @@ class GameInterfaceCLI(IGameInterface):
         if not name:
             return
 
-        result = Result(False)
+        player = None
         if name:
-            result = self.game.getPlayer(name)
+            player = self._getPlayerByName(self.game, name)
 
-        if not result.result:
-            print(result.responseMsg)
+        if not player:
+            print(f"Could not find player with name \"{name}\"")
         else:
-            player = cast(Player, result.additional)
             cardFile, _ = CardImgCreator().createGraphicalCard(player.card)
             print(f"Graphical card saved to: {cardFile}")
 
@@ -156,14 +156,13 @@ class GameInterfaceCLI(IGameInterface):
         if not name:
             return
 
-        result = Result(False)
+        player = None
         if name:
-            result = self.game.getPlayer(name)
+            player = self._getPlayerByName(self.game, name)
 
-        if not result.result:
-            print(result.responseMsg)
-        if result.result:
-            player = cast(Player, result.additional)
+        if not player:
+            print(f"Could not find player with name \"{name}\"")
+        else:
             cells = player.card.getCellsStr()
 
             # "Marked" the called cells in the card
@@ -223,4 +222,12 @@ class GameInterfaceCLI(IGameInterface):
             pass
 
         return name
+
+    def _getPlayerByName(self, game: Game, name: str) -> Optional[Player]:
+        ret = None
+        for player in game.players:
+            if player.card.getCardOwner() == name:
+                ret = player
+                break
+        return ret
 

@@ -7,24 +7,26 @@ __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
 import json
+import os
 
 from .Globals import GLOBALVARS
 
+from pathlib import Path
 from typing import Any
 
 class Config:
     __instance = None
-    __config = None
+    __config = {}
+    __file = Path(GLOBALVARS.FILE_CONFIG_GENERAL)
 
     def __new__(cls, *args, **kwargs):
         if not cls.__instance:
             cls.__instance = super().__new__(cls, *args, **kwargs)
         return cls.__instance
 
-    def getConfig(self, configStr: str, default: Any = ""):
+    def getConfig(self, configStr: str, default: Any = "") -> Any:
         if not self.__config:
-            with open(GLOBALVARS.FILE_CONFIG_GENERAL, 'r') as file:
-                self.__config = json.load(file)
+            self._loadConfig()
         return self.__config.get(configStr, default)
 
     def getFormatConfig(self, configStr: str, template: str) -> str:
@@ -35,4 +37,14 @@ class Config:
             ret = template.format(**data)
 
         return ret
+
+    def _loadConfig(self):
+        if not Config.__file.exists() or not os.path.getsize(Config.__file):
+            return
+
+        with Config.__file.open("r") as file:
+            try:
+                self.__config = json.load(file)
+            except Exception as e:
+                print(f"Could not load config data: {e}")
 

@@ -7,12 +7,13 @@ __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
 import json
+import os
 import time
 
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Globals import GLOBALVARS
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 TypeBannedData = Dict[str, str]
 TypeBannedPlayer = Dict[str, TypeBannedData]
@@ -67,11 +68,18 @@ class BannedData:
             del self.data[str(playerID)]
             self.flush()
 
+    def getAllBanned(self) -> List[int]:
+        return [int(playerID) for playerID in self.data.keys()]
+
     def _loadData(self):
-        if not self.bannedFile.exists():
+        if not self.bannedFile.exists() or not os.path.getsize(self.bannedFile):
+            BannedData.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Banned file is empty or non existent, skipping load.")
             return
 
         BannedData.__LOGGER.log(LogLevel.LEVEL_INFO, "Reading in banned player data.")
         with self.bannedFile.open("r") as file:
-            self.data = json.load(file)
+            try:
+                self.data = json.load(file)
+            except Exception as e:
+                BannedData.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Could not load banned player data file: {e}")
 

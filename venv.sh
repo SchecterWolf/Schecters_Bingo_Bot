@@ -28,62 +28,69 @@ Usage: source $(basename "$0") [options]
 
 options:
     -i          initialize
+    -r          refresh venv (adds -i)
 
     -h 			Show help
 
 EOF
-exit 1
 }
 
-main() {
-    # Global VARS
-    local -r _VENV_NAME="BingoBot"
-    local _init=0
+# Global VARS
+_VENV_NAME="BingoBot"
+_init=0
+_refresh=0
 
-    POSITIONAL_PARAMS=""
-    while (( "$#" )); do
-        case "$1" in
-            -i)
-                _init=1
-                shift
-                ;;
-            --help|-*|--*=) # unsupported flags
-                print_usage
-                ;;
-            *) # preserve positional arguments
-                POSITIONAL_PARAMS="$POSITIONAL_PARAMS $1"
-                shift
-                ;;
-        esac
-    done
-    eval set -- "$POSITIONAL_PARAMS"
+POSITIONAL_PARAMS=""
+while (( "$#" )); do
+    case "$1" in
+        -i)
+            _init=1
+            shift
+            ;;
+        -r)
+            _refresh=1
+            shift
+            ;;
+        --help|-*|--*=) # unsupported flags
+            print_usage
+            return 1
+            ;;
+        *) # preserve positional arguments
+            POSITIONAL_PARAMS="$POSITIONAL_PARAMS $1"
+            shift
+            ;;
+    esac
+done
+eval set -- "$POSITIONAL_PARAMS"
 
-    if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-        >&2 echo "Script must be called as: source $0"
-        exit 1
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    >&2 echo "Script must be called as: source $0"
+    return 1
+fi
+
+# Rm the exist venv if we are refreshing
+if [ "$_refresh" -eq 1 ]; then
+    rm -rf $_VENV_NAME
+fi
+
+# Initialize the new python virtual env if it hasnt already
+if [ ! -d "$_VENV_NAME" ]; then
+    # Check if virtualenv exists
+    if ! command -v "virtualenv" &> /dev/null; then
+        sudo pip install --break-system-packages virtualenv
     fi
 
-    # Initialize the new python virtual env if it hasnt already
-    if [ ! -d "$_VENV_NAME" ]; then
-        # Check if virtualenv exists
-        if ! command -v "virtualenv" &> /dev/null; then
-            sudo pip install --break-system-packages virtualenv
-        fi
+    echo "Creating python virtual environment"
+    virtualenv $_VENV_NAME
+    _init=1
+fi
 
-        echo "Creating python virtual environment"
-        virtualenv $_VENV_NAME
-        _init=1
-    fi
+# Enter into the python virtual env
+source "$_VENV_NAME/bin/activate"
 
-    # Enter into the python virtual env
-    source "$_VENV_NAME/bin/activate"
+# Install the project requirements, if needed
+if [ "$_init" -eq 1 ] && [ -f "./requirements.txt" ]; then
+    pip install -r ./requirements.txt
+fi
 
-    # Install the project requirements, if needed
-    if [ "$_init" -eq 1 ] && [ -f "./requirements" ]; then
-        pip install -r ./requirements.txt
-    fi
-
-    echo "Enter command to exit: deactivate"
-}
-
-main
+echo "Enter command to exit: deactivate"

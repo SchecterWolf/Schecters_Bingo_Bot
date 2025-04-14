@@ -6,6 +6,8 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
+import time
+
 from .BannedData import BannedData
 from .Bing import Bing
 from .Binglets import Binglets
@@ -14,10 +16,12 @@ from .PersistentStats import PersistentStats
 from .Player import Player
 from .Result import Result
 
+from better_profanity import profanity
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
+from config.Globals import GLOBALVARS
 from enum import Enum
-from typing import List, Optional, Set, Union
+from typing import List, Optional, Set
 
 class GameState(Enum):
     NEW = 1 # Uninitialized
@@ -38,11 +42,13 @@ class Game:
         GameState.STOPPED: "paused"
     }
 
-    def __init__(self):
-        self.config: Config = Config()
+    def __init__(self, gameType: str = GLOBALVARS.GAME_TYPE_DEFAULT):
         self.bannedPlayers = BannedData()
+        self.config: Config = Config()
         self.persistentStats: Optional[PersistentStats] = None
         self.state: GameState = GameState.NEW
+        self.timeStarted = time.time()
+        self.gameType = gameType
 
         self.calledBings: Set[Bing] = set()
         self.kickedPlayers: Set[int] = set()
@@ -56,7 +62,7 @@ class Game:
         else:
             self.state = GameState.IDLE
             self.persistentStats = stats
-            Game._LOGGER.log(LogLevel.LEVEL_ERROR, "Game initialized successfully.")
+            Game._LOGGER.log(LogLevel.LEVEL_INFO, "Game initialized successfully.")
 
         return self.state != GameState.NEW
 
@@ -68,7 +74,7 @@ class Game:
         Game._LOGGER.log(LogLevel.LEVEL_DEBUG, "Game is starting...")
         ret = Result(True)
 
-        if self.state != GameState.IDLE:
+        if self.state != GameState.IDLE and self.state != GameState.PAUSED:
             ret.result = False
             ret.responseMsg = f"Cannot start the bingo game while the game is {self._getStateString()}."
 
@@ -89,7 +95,8 @@ class Game:
         ret = Result(False)
 
         # Sanity Check
-        if self.state == GameState.STOPPED:
+        if self.state == GameState.STOPPED or self.state == GameState.DESTROYED:
+            ret.responseMsg = f"Cannot stop the bingo game while the game is {self._getStateString()}."
             return ret
 
         if self.persistentStats:
@@ -146,7 +153,7 @@ class Game:
         # Try to generate a unique game card for the player for a given number of tries
         while tries < Game._NUM_GEN_TRIES:
             Game._LOGGER.log(LogLevel.LEVEL_DEBUG, f"Attempting to generate new card for player {playerName}")
-            cardID = player.card.generateNewCard()
+            cardID = player.card.generateNewCard(self.gameType)
             matchedCards = []
 
             for _player in self.players:
@@ -244,7 +251,13 @@ class Game:
             Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
             return ret
 
-        calledBing = Binglets().getBingFromIndex(index)
+        calledBing = Binglets(self.gameType).getBingFromIndex(index)
+
+        # Make sure we have a valid bing
+        if calledBing.bingIdx < 0:
+            ret.responseMsg = f"Cannot make a call with an invalid bing index."
+            Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
+            return ret
 
         Game._LOGGER.log(LogLevel.LEVEL_INFO, f"Marking \"{calledBing.bingStr}\" as called!")
         self.calledBings.add(calledBing)
@@ -277,9 +290,22 @@ class Game:
             return ret
 
         # Make sure the player is still playing the game
-        if not self.getPlayer(callRequest.getRequesterName()).result:
+        if not self.getPlayer(callRequest.getRequesterID()).result:
             ret.responseMsg = f"Player {callRequest.getPrimaryRequester().card.getCardOwner()} has not been added\
  to the game. Rejecting the request call."
+            Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
+            return ret
+
+        # Make sure the request bing exists
+        if Binglets(self.gameType).getBingFromIndex(callRequest.requestBing.bingIdx).bingIdx <= 0:
+            ret.responseMsg = f"The requested slot does not exist for the current game"
+            Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
+            return ret
+
+        # Make sure the requested bing exists for the player making the request
+        if len(callRequest.players) == 1 and not callRequest.getPrimaryRequester().card.getBingFromID(callRequest.requestBing.bingIdx):
+            ret.responseMsg = f"Player {callRequest.getPrimaryRequester().card.getCardOwner()} cannot make a request\
+for a slot that they do not have on their board."
             Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
             return ret
 
@@ -300,46 +326,53 @@ class Game:
         ret.result = True
         ret.responseMsg = f"Request for {callRequest.requestBing.bingStr} has been made."
         if len(existingRequest.players) > 1:
-            ret.responseMsg += f"There are {len(existingRequest.players)} players with this same request."
+            ret.responseMsg += f" There are {len(existingRequest.players)} players with this same request."
         ret.additional = existingRequest
 
         Game._LOGGER.log(LogLevel.LEVEL_INFO, ret.responseMsg)
         return ret
 
-    def deleteRequest(self, index: int) -> Result:
-        ret = Result(True)
+    def deleteRequest(self, index: int, exempt: bool = False) -> Result:
+        ret = Result(False)
 
         # Check game condition
         if self.state != GameState.STARTED and self.state != GameState.PAUSED:
-            ret.result = False
             ret.responseMsg = f"Cannot delete call requests while the bingo game is {self._getStateString()}."
+            return ret
 
         # Attempt to remove call request, if any
-        if ret.result:
-            removed = False
-            for request in self.requestedCalls:
-                if index == request.requestBing.bingIdx:
-                    removed = True
-                    ret.responseMsg = f"Call request \"{request.requestBing.bingStr}\" was removed."
-                    self.requestedCalls.remove(request)
-            if not removed:
-                Game._LOGGER.log(LogLevel.LEVEL_WARN, f"There is no outstanding request for index \"{index}\", skipping.")
+        for request in self.requestedCalls:
+            if index == request.requestBing.bingIdx:
+                ret.result = True
+                ret.responseMsg = f"Call request \"{request.requestBing.bingStr}\" was removed."
+                self.requestedCalls.remove(request)
+
+                # Update the rejection notice for each player who had the request
+                if not exempt:
+                    for player in request.players:
+                        player.addRequestRejection()
+
+                break
+
+        if not ret.result and not exempt:
+            ret.responseMsg = f"There is no outstanding request for index \"{index}\", skipping."
 
         Game._LOGGER.log(LogLevel.LEVEL_INFO if ret.result else LogLevel.LEVEL_ERROR, ret.responseMsg)
+
         return ret
 
-    def getPlayer(self, playerName: str) -> Result:
+    def getPlayer(self, playerID: int) -> Result:
         ret = Result(False)
         for player in self.players:
-            if player.card.getCardOwner() == playerName:
-                ret.responseMsg = f"Game card found for player \"{playerName}\""
+            if player.userID == playerID:
+                ret.responseMsg = f"Game card found for player \"{player.card.getCardOwner()}\""
                 ret.additional = player
                 ret.result = True
                 Game._LOGGER.log(LogLevel.LEVEL_INFO, ret.responseMsg)
                 break
 
         if not ret.result:
-            ret.responseMsg = f"Could not find game card for player \"{playerName}\""
+            ret.responseMsg = f"Could not find game card for player ID \"{playerID}\""
 
         return ret
 
@@ -349,39 +382,64 @@ class Game:
     def getAllPlayers(self) -> List[Player]:
         return list(self.players)
 
+    def getKickedPlayers(self) -> List[int]:
+        return list(self.kickedPlayers)
+
     def getPlayerBingos(self) -> List[str]:
         return list(self.playerBingos)
 
     def getCalls(self) -> List[Bing]:
         return list(self.calledBings)
 
-    def checkEligible(self, player: Union[Player, int]) -> Result:
+    def getNumRequestByPlayer(self, player: Player) -> int:
+        numReq = 0
+
+        for req in self.requestedCalls:
+            numReq += 1 if player in req.players else 0
+
+        return numReq
+
+    def playerHasRequest(self, player: Player, bingID: int) -> bool:
+        ret = False
+
+        for rq in self.requestedCalls:
+            ret = bingID == rq.requestBing.bingIdx and player in rq.players
+            if ret:
+                break
+
+        return ret
+
+    def checkEligibleFromID(self, name: str, userID: int) -> Result:
+        return self.checkEligible(Player(name, userID))
+
+    def checkEligible(self, player: Player) -> Result:
         ret = Result(False)
-        pl = player if not isinstance(player, int) else Player(" ", player)
-        name = "You are" if isinstance(player, int) else f"{player.card.getCardOwner()} is"
+        name = player.card.getCardOwner()
 
         # Make sure the user has a valid player ID
-        if pl.userID < 0 and not Config().getConfig("Debug"):
-            ret.responseMsg = f"Cannot add player with invalid ID of: {pl.userID}"
+        if player.userID < 0 and not Config().getConfig("Debug"):
+            ret.responseMsg = f"Cannot add player with invalid ID of: {player.userID}"
             return ret
 
         # Check if the player has been banned
-        if self.bannedPlayers.isBanned(pl.userID):
-            ret.responseMsg = f"{name} banned from the game."
+        if self.bannedPlayers.isBanned(player.userID):
+            ret.responseMsg = f"{name} is banned from the game."
             return ret
 
         # Check if the player has been kicked before
-        if pl.userID in self.kickedPlayers:
-            ret.responseMsg = f"{name} kicked from the game, cannot rejoin."
+        if player.userID in self.kickedPlayers:
+            ret.responseMsg = f"{name} is kicked from the game, cannot rejoin."
             return ret
 
         # Check if player has already been added to the game
-        if pl in self.players:
-            ret.responseMsg = f"{name} already playing the game."
+        if player in self.players:
+            ret.responseMsg = f"{name} is already playing the game."
             return ret
 
-        # TODO SCH Use a vulger language filter to check username before adding
-        #           Useful libs: better_profanity, profanity-check
+        # Make sure the user's name is not vulger
+        if profanity.contains_profanity(name):
+            ret.responseMsg = f"Player's name \"{name}\" is not permissible"
+            return ret
 
         ret.result = True
         return ret

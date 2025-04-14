@@ -12,11 +12,11 @@ class GLOBALVARS:
     PROJ_ROOT = str(Path(__file__).parent.parent)
 
     DIR_RESOURCES = PROJ_ROOT + "/resources"
-    DIR_CARD_IMAGES = DIR_RESOURCES + "/cards"
     DIR_DATA = DIR_RESOURCES + "/data"
+    DIR_CONFIG = PROJ_ROOT + "/config"
 
-    FILE_CONFIG_GENERAL = PROJ_ROOT + "/config/config.json"
-    FILE_CONFIG_BINGLETS = PROJ_ROOT + "/config/binglets.json"
+    FILE_CONFIG_GENERAL = DIR_CONFIG + "/config.json"
+    FILE_CONFIG_BINGLETS = DIR_CONFIG + "/binglets.json"
     FILE_BANNED_DATA = DIR_DATA + "/banned.json"
     FILE_GAME_DATA = DIR_DATA + "/game.json"
     FILE_PLAYER_DATA = DIR_DATA + "/players.json"
@@ -32,14 +32,19 @@ class GLOBALVARS:
     IMAGE_RANK_3RD_BOARD = DIR_RESOURCES + "/assets/RankUI3rd.png"
     IMAGE_RANK_BOARD = DIR_RESOURCES + "/assets/RankUI.png"
 
-    CHANNEL_BINGO = "bingo"
+    CHANNEL_BINGO = "bingo" # TODO SCH change these to use the config instead
     CHANNEL_ADMIN_BINGO ="bingo-admin"
 
     GAME_MSG_ENDED = "{StreamerName} livestream bingo has ended."
     GAME_MSG_PAUSED = "{StreamerName} livestream bingo game is paused."
     GAME_MSG_RESUMED = "{StreamerName} livestream bingo game has been resumed."
     GAME_MSG_STARTED = "{StreamerName} livestream bingo game has been started!"
-    GAME_MSG_JOIN = "To play the livestream bingo, visit our discord and click the \"Play Bingo\" in the bingo channel!"
+    GAME_MSG_JOIN = "To play the livestream bingo, visit our discord and click the \"Play Bingo\" in the bingo channel!" # TODO SCH use the config var for the bingo channel
+    GAME_MSG_ADDED = "Player \"{player}\" has joined the livestream bingo!"
+    GAME_MSG_KICKED = "Player \"{player}\" has been KICKED from the livestream bingo."
+    GAME_MSG_BANNED = "Player \"{player}\" has been BANNED from the livestream bingo."
 
     GAME_NIGHTBOT_CMD_DISCORD = "!discord"
+
+    GAME_TYPE_DEFAULT = "default"
 

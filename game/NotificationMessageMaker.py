@@ -47,12 +47,14 @@ def MakePlayersBingoNotif(players: List[Player]) -> str:
         bingosStr = f"New player bingos: {bingosStr}"
     return bingosStr
 
-def MakeCallRequestNotif(request: CallRequest) -> str:
-    reqStr = f"Slot \"{request.requestBing.bingStr}\" is requested by {request.getPrimaryRequester().card.getCardOwner()}"
+def MakeCallRequestNotif(request: CallRequest, includeID = False) -> str:
+    if includeID:
+        reqStr = f"Slot \"[{request.requestBing.bingIdx}]{request.requestBing.bingStr}\" is requested by {request.getPrimaryRequester().card.getCardOwner()}"
+    else:
+        reqStr = f"Slot \"{request.requestBing.bingStr}\" is requested by {request.getPrimaryRequester().card.getCardOwner()}"
     if len(request.players) < 2:
         reqStr += "."
     else:
-        reqStr += f" and {len(request.players) - 1} other" + "s." if len(request.players) > 2 else "."
-
+        reqStr += f" and {len(request.players) - 1} other" + ("s." if len(request.players) > 2 else ".")
     return reqStr
 

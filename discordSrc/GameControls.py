@@ -25,7 +25,7 @@ class GameControls(View, IContentItem):
 
     def __init__(self, gameID: int):
         View.__init__(self, timeout=None)
-        IContentItem.__init__(self, "Game controls")
+        IContentItem.__init__(self, GameControls.MSG_STR)
 
         self.startButton = StartGameButton()
         self.pauseButton = PauseGameButton(gameID)

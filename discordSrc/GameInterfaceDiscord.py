@@ -6,6 +6,7 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
+import asyncio
 import discord
 
 from .AdminChannel import AdminChannel
@@ -13,13 +14,18 @@ from .BingoChannel import BingoChannel
 from .CallNoticeEmbed import CallNoticeEmbed
 from .GameGuild import GameGuild
 from .IAsyncDiscordGame import IAsyncDiscordGame
+from .Mee6Controller import Mee6Controller
 from .MockUserDMChannel import MockUserDMChannel
-from .TaskProcessor import TaskProcessor, TaskUpdateUserDMs
+from .TaskPauseUserDMs import TaskPauseUserDMs
+from .TaskProcessor import TaskProcessor
+from .TaskStartUserDMs import TaskStartUserDMs
+from .TaskStopUserDMs import TaskStopUserDMs
+from .TaskUpdateUserDMs import TaskUpdateUserDMs
 from .UserDMChannel import UserDMChannel
 
-from config.ClassLogger import ClassLogger
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
-from config.Log import LogLevel
+from config.Globals import GLOBALVARS
 
 from game.ActionData import ActionData
 from game.Binglets import Binglets
@@ -30,26 +36,29 @@ from game.Player import Player
 from game.Result import Result
 from game.Sync import sync_aware
 
-from typing import Set, cast
+from typing import Optional, Set, cast
 
 from youtube.GameInterfaceYoutube import GameInterfaceYoutube
 
 class GameInterfaceDiscord(IAsyncDiscordGame):
     __LOGGER = ClassLogger(__name__)
 
-    def __init__(self, bot: discord.Client, gameGuild: GameGuild):
-        super().__init__(gameGuild)
+    def __init__(self, bot: discord.Client, gameGuild: GameGuild, gameType: str):
+        super().__init__(gameGuild, gameType)
         self.bot = bot
         self.initialized = False
         self.taskProcessor = TaskProcessor(self.bot.loop)
+        self.mee6Controller = Mee6Controller(gameGuild.channelAdmin)
+        self.lock = asyncio.Lock()
+        self.YTiface: Optional[GameInterfaceYoutube] = None
+        self.channelAdmin = None
+        self.channelBingo = None
 
-        if Config().getConfig("YTChannelID") and False: # TODO SCH comment back in once im done testing the refactor
-            self.YTiface = GameInterfaceYoutube()
-        else:
-            self.YTiface = None
+        if Config().getConfig("YTEnabled", False):
+            self.YTiface = GameInterfaceYoutube(self)
 
         # Game view states
-        self.viewState = GameState.IDLE
+        self.viewState = GameState.NEW
         self.debugMode = Config().getConfig("Debug", False)
 
     async def init(self) -> Result:
@@ -60,8 +69,12 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Discord interface initializing.")
         ret = Result(True)
 
+        if self.game.gameType != GLOBALVARS.GAME_TYPE_DEFAULT and self.game.gameType not in Config().getConfig("GameTypes", []):
+            ret.result = False
+            ret.responseMsg = f"Game started with an invalid game mode type \"{self.game.gameType}\""
+
         # Init the game obj
-        if not self.game.initGame(self.gameGuild.persistentStats):
+        if ret.result and not self.game.initGame(self.gameGuild.persistentStats):
             ret.result = False
             ret.responseMsg = "There was a problem initializing the game."
 
@@ -71,7 +84,7 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
         # Admin view init
         if ret.result:
-            self.channelAdmin = AdminChannel(self.gameGuild)
+            self.channelAdmin = AdminChannel(self.gameGuild, self.game.gameType)
 
         # Set internal states
         if ret.result:
@@ -96,6 +109,10 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         return ret
 
     async def start(self) -> Result:
+        async with self.lock:
+            return await self._start()
+
+    async def _start(self) -> Result:
         self.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Discord game interface starting.")
         ret = Result(True)
 
@@ -103,6 +120,10 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         if not self.initialized:
             ret.result = False
             ret.responseMsg = "Bot has not been initialized, cannot start the game."
+
+        # Make sure the game isn't already started
+        if self.viewState == GameState.STARTED:
+            return ret
 
         # Start the game
         if ret.result:
@@ -121,26 +142,47 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         return ret
 
     async def destroy(self) -> Result:
+        async with self.lock:
+            return await self._destroy()
+
+    async def _destroy(self) -> Result:
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_WARN, f"Guild game destroyed: {self.gameGuild.guildID}.")
-        await self.stop()
+        await self._stop()
         self.game.destroyGame()
         if self.YTiface:
             self.YTiface.destroy()
+
+        self.viewState = GameState.DESTROYED
+
         return Result(True)
 
     async def stop(self) -> Result:
+        async with self.lock:
+            return await self._stop()
+
+    async def _stop(self) -> Result:
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_WARN, f"Stopping game for guild ID {self.gameGuild.guildID}.")
+
+        # Make sure the game isn't already stopped
+        if self.viewState == GameState.STOPPED:
+            return Result(True)
+
         # We have to grab the list of players before stopping the game because they get cleared
         players = self.game.getAllPlayers()
-        self.game.stopGame()
+
+        ret = self.game.stopGame()
+        if not ret.result:
+            return ret
+
         if self.YTiface:
             self.YTiface.stop()
         await self._crankStateViews()
 
         # Update the user DM views
         for player in players:
-            if player.ctx:
-                await player.ctx.setViewStopped()
+            self.taskProcessor.addTask(TaskStopUserDMs(player))
+
+        await self.mee6Controller.issueEXP(players)
 
         # Stop the task processor
         self.taskProcessor.stop()
@@ -148,19 +190,69 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         return Result(True)
 
     @sync_aware
-    async def pause(self) -> Result:
+    async def pause(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
+        async with self.lock:
+            ret = await self._pause(data)
+        self.taskProcessor.resume()
+        return ret
+
+    async def _pause(self, data: ActionData) -> Result:
+        GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_INFO, f"Pausing bingo game.")
+
+        # Make sure the game isn't already paused
+        if self.viewState == GameState.PAUSED:
+            return Result(True)
+
+        # Pause the internal game
+        ret = self.game.pauseGame()
+        if not ret.result:
+            return ret
+
+        # Send pause to the YT iface, we don't care if its successful or not
         if self.YTiface:
             self.YTiface.pause()
-        return Result(False)
+
+        await self._crankStateViews()
+        await self._followup(data)
+
+        self.finalizeAction(data)
+        return Result(True)
 
     @sync_aware
-    async def resume(self) -> Result:
+    async def resume(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
+        async with self.lock:
+            ret = await self._resume(data)
+        self.taskProcessor.resume()
+        return ret
+
+    async def _resume(self, data: ActionData) -> Result:
+        GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_INFO, f"Resuming bingo game.")
+
+        # Make sure the game isn't already started:
+        if self.viewState == GameState.STARTED:
+            return Result(True)
+
+        self.game.resumeGame()
         if self.YTiface:
             self.YTiface.resume()
-        return Result(False)
+
+        await self._crankStateViews()
+        await self._followup(data)
+
+        self.finalizeAction(data)
+        return Result(True)
 
     @sync_aware
     async def addPlayer(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
+        async with self.lock:
+            ret = await self._addPlayer(data)
+        self.taskProcessor.resume()
+        return ret
+
+    async def _addPlayer(self, data: ActionData) -> Result:
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Attempting to add player...")
         ret = Result(False)
         interaction: discord.Interaction = data.get("interaction")
@@ -179,7 +271,10 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
             ret = self.game.addPlayer(user.display_name, user.id)
 
         # Start the player DM view
-        if ret.result:
+        if ret.result and not ret.additional:
+            GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_ERROR, "Internal error! Was expecting a play in additionals.")
+            ret.result = False
+        elif ret.result:
             player = cast(Player, ret.additional)
 
             if user.dm_channel:
@@ -195,21 +290,32 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         # Note: The 'refresh' attr is not normally used except for the bulk add debug command,
         #       which sets it to false so the bingo channel isn't spammed
         refresh = data.get("refresh") if data.has("refresh") else True
-        if ret.result and refresh:
+        if ret.result and refresh and self.channelBingo:
             await self.channelBingo.refreshGameStatus()
 
         if ret.result and self.YTiface:
+            data.add(displayName=user.display_name)
             self.YTiface.addPlayer(data)
 
-        if not ret.result:
+        if ret.result:
+            GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Successfully added player {user.display_name} ({user.id})")
+        else:
             GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
             if interaction.user.dm_channel:
                 await interaction.user.dm_channel.send(ret.responseMsg)
 
+        self.finalizeAction(data)
         return ret
 
     @sync_aware
     async def kickPlayer(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
+        async with self.lock:
+            ret = await self._kickPlayer(data)
+        self.taskProcessor.resume()
+        return ret
+
+    async def _kickPlayer(self, data: ActionData) -> Result:
         ret = Result(False)
         user: discord.Member = data.get("member")
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Kicking player {user.display_name} ({user.id})")
@@ -222,7 +328,7 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         ret = self.game.kickPlayer(user.id)
 
         # Refresh views
-        if ret.result:
+        if ret.result and self.channelBingo:
             await self.channelBingo.refreshGameStatus()
 
         # Update the user view
@@ -232,22 +338,47 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
             if kickedPlayer.ctx:
                 await kickedPlayer.ctx.setViewKicked(action)
 
+        if ret.result and self.YTiface:
+            data.add(displayName=user.display_name)
+            self.YTiface.kickPlayer(data)
+
+        self.finalizeAction(data)
         return ret
 
     @sync_aware
     async def banPlayer(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
+        async with self.lock:
+            ret = await self._banPlayer(data)
+        self.taskProcessor.resume()
+        return ret
+
+    async def _banPlayer(self, data: ActionData) -> Result:
         data.add(banned=True)
-        # Invoke without the sync wrapper since we're internal and do want to block
-        await self.kickPlayer.__wrapped__(self, data)
+        ret = await self._kickPlayer(data)
         user: discord.Member = data.get("member")
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Banning player {user.display_name} ({user.id})")
 
         # Ban player regardless of kickPlayer result
         self.game.banPlayer(user.id, user.display_name)
-        return Result(True)
+        ret.result = True # Banning always succeeds
+
+        if self.YTiface:
+            data.add(displayName=user.display_name)
+            self.YTiface.kickPlayer(data)
+
+        self.finalizeAction(data)
+        return ret
 
     @sync_aware
     async def makeCall(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
+        async with self.lock:
+            ret = await self._makeCall(data)
+        self.taskProcessor.resume()
+        return ret
+
+    async def _makeCall(self, data: ActionData) -> Result:
         index: int = data.get("index")
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Call made for index: {index}")
 
@@ -263,7 +394,7 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         newBingos: Set[Player] = set()
         if ret.result:
             markedPlayers, newBingos = ret.additional
-            bingStr = Binglets().getBingFromIndex(index).bingStr
+            bingStr = Binglets(self.game.gameType).getBingFromIndex(index).bingStr
 
             # Add all players with new bingos
             for player in newBingos:
@@ -279,16 +410,17 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
         # Remove any matching call requests
         if ret.result:
-            await self.deleteRequest.__wrapped__(self, data)
+            data.add(exempt=True)
+            await self._deleteRequest(data)
 
         # Update the bingo channel with the call notice
         newPlayerBingos = ""
-        if ret.result:
+        if ret.result and self.channelBingo:
             newPlayerBingos = MakePlayersBingoNotif(list(newBingos))
-            noticeEmbed = CallNoticeEmbed(Binglets().getBingFromIndex(index), list(markedPlayers), newPlayerBingos)
+            noticeEmbed = CallNoticeEmbed(Binglets(self.game.gameType).getBingFromIndex(index), list(markedPlayers), newPlayerBingos)
             await self.channelBingo.refreshGameStatus()
             await self.channelBingo.sendNoticeItem(embed=noticeEmbed, file=noticeEmbed.file)
-        else:
+        elif self.channelAdmin:
             await self.channelAdmin.sendNotice(f"(ERROR) {ret.responseMsg}")
             GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
 
@@ -298,10 +430,18 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
             data = ActionData(index=index, newPlayerCalls=newPlayerCalls, newPlayerBingos=newPlayerBingos)
             self.YTiface.makeCall(data)
 
+        self.finalizeAction(data)
         return ret
 
     @sync_aware
     async def requestCall(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
+        async with self.lock:
+            ret = await self._requestCall(data)
+        self.taskProcessor.resume()
+        return ret
+
+    async def _requestCall(self, data: ActionData) -> Result:
         callRequest: CallRequest = data.get("callRequest")
         # Verify initialized
         if not self.initialized and not self.channelAdmin:
@@ -311,7 +451,7 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         ret = self.game.requestCall(callRequest)
 
         # Update the admin channel view
-        if ret.result:
+        if ret.result and self.channelAdmin:
             await self.channelAdmin.addCallRequest(ret.additional)
 
         # Let the player know that their call request was successfull
@@ -323,23 +463,33 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         if ret.result and self.YTiface:
             self.YTiface.requestCall(ActionData(callRequest=ret.additional))
 
+        self.finalizeAction(data)
         return ret
 
     @sync_aware
     async def deleteRequest(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
+        async with self.lock:
+            ret = await self._deleteRequest(data)
+        self.taskProcessor.resume()
+        return ret
+
+    async def _deleteRequest(self, data: ActionData) -> Result:
         index: int = data.get("index")
+        exempt: bool = data.get("exempt") if data.has("exempt") else False
 
         # Verify initialized
         if not self.initialized or not self.channelAdmin:
             return Result(False, response="Discord interface not initialized, cannot handle request.")
 
         # Delete  call request in the game
-        ret = self.game.deleteRequest(index)
+        ret = self.game.deleteRequest(index, exempt)
 
         # Update the admin channel view
-        if ret.result:
+        if ret.result and self.channelAdmin:
             await self.channelAdmin.delCallRequest(index)
 
+        self.finalizeAction(data)
         return ret
 
     async def _crankStateViews(self) -> Result:
@@ -354,15 +504,23 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
             if self.channelBingo:
                 await self.channelBingo.setViewNew()
 
-        # Setup the bingo channels to starting state
+        # Set the bingo channels to starting state
         elif gameState == GameState.STARTED and self.viewState != GameState.STARTED:
-            if self.channelAdmin:
-                await self.channelAdmin.setViewStarted()
             if self.channelBingo:
                 await self.channelBingo.setViewStarted()
-            players = self.game.getAllPlayers()
-            for player in players:
-                await player.ctx.setViewStarted()
+            if self.channelAdmin:
+                await self.channelAdmin.setViewStarted()
+            for player in self.game.getAllPlayers():
+                self.taskProcessor.addTask(TaskStartUserDMs(player))
+
+        # Set the views to paused state
+        elif gameState == GameState.PAUSED and self.viewState != GameState.PAUSED:
+            if self.channelAdmin:
+                await self.channelAdmin.setViewPaused()
+            if self.channelBingo:
+                await self.channelBingo.setViewPaused()
+            for player in self.game.getAllPlayers():
+                self.taskProcessor.addTask(TaskPauseUserDMs(player))
 
         # Set the views to the stopped state
         elif gameState == GameState.STOPPED:
@@ -381,4 +539,23 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
             self.viewState = gameState
 
         return ret
+
+    async def _followup(self, data: ActionData):
+        interaction: discord.Interaction = data.get("interaction")
+        # TODO SCH Audit if 'not' should be in this conditional. Update tests
+        if not interaction.response.is_done():
+            return
+
+        msg: Optional[discord.WebhookMessage] = await interaction.followup.send(content=".", ephemeral=True)
+        if msg:
+            await cast(discord.WebhookMessage, msg).delete()
+
+    def finalizeAction(self, data: ActionData):
+        finalize = None
+
+        if data.has(ActionData.FINALIZE_FUNCT):
+            finalize = data.get(ActionData.FINALIZE_FUNCT)
+
+        if callable(finalize):
+            finalize()
 

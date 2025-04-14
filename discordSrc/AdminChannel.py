@@ -12,29 +12,34 @@ from .IChannelInterface import IChannelInterface, ChannelView, verifyView
 from .MakeCallView import MakeCallView
 from .RequestView import RequestView
 
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from config.Globals import GLOBALVARS
 from game.CallRequest import CallRequest
 from typing import List
 
 class AdminChannel(IChannelInterface):
+    __LOGGER = ClassLogger(__name__)
     __MSG_GAME_CONTROLS = "gamecontrols"
     __MSG_MAKE_CALL = "makecall"
 
-    def __init__(self, gameGuild: GameGuild):
+    def __init__(self, gameGuild: GameGuild, gameType: str):
         super().__init__(gameGuild.channelAdmin)
 
         self.gameID = gameGuild.guildID
-        self.callView = MakeCallView(gameGuild.guildID)
+        self.callView = MakeCallView(gameGuild.guildID, gameType)
         self.gameControls = GameControls(gameGuild.guildID)
         self.requestsViews: List[RequestView] = []
 
     @verifyView(ChannelView.NEW)
     async def setViewNew(self):
+        ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, "setViewNew called")
         await self._purgeChannel()
+        await self.sendNotice("Setting up game...")
 
     @verifyView(ChannelView.STARTED)
     async def setViewStarted(self):
+        ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, "setViewStarted called")
         await self.removeNotice()
         self.gameControls.setControllsState(GameControlState.RUNNING)
         await self._updateChannelItem(AdminChannel.__MSG_GAME_CONTROLS, content=self.gameControls.msgStr, view=self.gameControls)
@@ -57,6 +62,7 @@ class AdminChannel(IChannelInterface):
         await self.sendNotice(Config().getFormatConfig("StreamerName", GLOBALVARS.GAME_MSG_ENDED))
 
     async def addCallRequest(self, request: CallRequest):
+        AdminChannel.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Adding call request ID ({request.requestBing.bingIdx}) to the admin channel view.")
         requestView = None
         for req in self.requestsViews:
             if request.isMatchingRequest(req.callRequest):
@@ -65,7 +71,7 @@ class AdminChannel(IChannelInterface):
 
         # Update the request view, or add a new one if necessary
         if requestView:
-            requestView.callRequest.mergeRequests(request)
+            requestView.updateRequest(request)
         else:
             requestView = RequestView(self.gameID, request)
             self.requestsViews.append(requestView)

@@ -22,7 +22,8 @@ from typing import Deque, List, cast
 
 class GameStatusEmbed(Embed):
     __LOGGER = ClassLogger(__name__)
-    __STATS_EMBED_AUTHOR = "Active Livestream Bingo: FiveM" # TODO SCH 'FiveM' will need to be configurable
+    __STATS_EMBED_AUTHOR = "Active Livestream Bingo: {gameType}"
+    __STATS_EMBED_AUTHOR_ENDED = "Ended Bingo"
     __ORDINALS = ["1st", "2nd", "3rd"]
     __ORDINAL_EMOJI = ["\U0001F947", "\U0001F948", "\U0001F949"]
     __INLINE_SPACER = "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"
@@ -38,15 +39,20 @@ class GameStatusEmbed(Embed):
     def __init__(self, gameID: int):
         super().__init__()
 
-        _iconName = os.path.basename(GLOBALVARS.IMAGE_BINGO_ICON)
-        self.file = discord.File(GLOBALVARS.IMAGE_BINGO_ICON, filename=_iconName)
+        self.iconName = os.path.basename(GLOBALVARS.IMAGE_BINGO_ICON)
+        self.file = discord.File(GLOBALVARS.IMAGE_BINGO_ICON, filename=self.iconName)
         self.gameID = gameID
 
         # Embed members
-        self.set_author(name=GameStatusEmbed.__STATS_EMBED_AUTHOR, icon_url=f"attachment://{_iconName}")
+        gameIface = GameStore().getGame(self.gameID)
+        fData = {"gameType": gameIface.game.gameType if gameIface else "Game"}
+        self.set_author(name=GameStatusEmbed.__STATS_EMBED_AUTHOR.format(**fData), icon_url=f"attachment://{self.iconName}")
         self.color = discord.Color.blue()
 
         self.refreshStats()
+
+    def reloadFile(self):
+        self.file = discord.File(GLOBALVARS.IMAGE_BINGO_ICON, filename=self.iconName)
 
     def refreshStats(self):
         GameStatusEmbed.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Refreshing active game stats embed.")
@@ -57,6 +63,9 @@ class GameStatusEmbed(Embed):
             self._refreshTopPlayers(game)
             self._refreshPlayers(game)
             self._refreshCalls(game)
+
+    def conclude(self):
+        self.set_author(name=GameStatusEmbed.__STATS_EMBED_AUTHOR_ENDED, icon_url=f"attachment://{self.iconName}")
 
     def _refreshTopPlayers(self, game: IGameInterface):
         iface = cast(IAsyncDiscordGame, game)
@@ -96,9 +105,9 @@ class GameStatusEmbed(Embed):
             val=f"\
 __**{player.name}**__\n\
 Bingos {bingos}\n\
-{GameStatusEmbed.__INLINE_SPACER_BIGGER}{bingos * bingoBonus} Pts\n\
+{GameStatusEmbed.__INLINE_SPACER_BIGGER}[{bingos * bingoBonus} Pts]\n\
 Slots Marked {slots}{GameStatusEmbed.__INLINE_SPACER}\n\
-{GameStatusEmbed.__INLINE_SPACER_BIGGER}{slots * callBonus} Pts\n\
+{GameStatusEmbed.__INLINE_SPACER_BIGGER}[{slots * callBonus} Pts]\n\
 **{player.points[PersistentStats.ITEM_TOTAL]} Pts Total**"
             self.add_field(name=f"{GameStatusEmbed.__ORDINAL_EMOJI[index]} {GameStatusEmbed.__ORDINALS[index]} Player",
                            value=val, inline=True)

@@ -14,11 +14,13 @@ from config.ClassLogger import ClassLogger, LogLevel
 from discord.ui import View, Button
 from game.ActionData import ActionData
 from game.GameStore import GameStore
-from game.Result import Result
-from typing import cast
+from typing import cast, Dict
+
+UserID = int
 
 class AddPlayerButton(View, IContentItem):
     __LOGGER = ClassLogger(__name__)
+    __INVALID_MESSAGE_ID = -1
 
     __btn_label = "Play The Stream Bingo!"
     __btn_id = "bingo_button"
@@ -31,7 +33,7 @@ class AddPlayerButton(View, IContentItem):
         IContentItem.__init__(self, "Join the game!")
 
         self.gameID = gameID
-        self.confirmMsgID = -1
+        self.confirmMsgIDs: Dict[UserID, int] = dict()
 
         button = Button(
             label=AddPlayerButton.__btn_label,
@@ -58,7 +60,7 @@ class AddPlayerButton(View, IContentItem):
             return
 
         # Check if the player is eligible
-        res = iface.game.checkEligible(interaction.user.id)
+        res = iface.game.checkEligibleFromID(interaction.user.display_name, interaction.user.id)
         if not res.result:
             await interaction.response.send_message(res.responseMsg, ephemeral=True)
             return
@@ -66,24 +68,24 @@ class AddPlayerButton(View, IContentItem):
         # Send confirmation DM
         try:
             message = await interaction.user.send(self._getGreeting(cast(discord.User, interaction.user)), view=dmView)
-            self.confirmMsgID = message.id
+            self.confirmMsgIDs[interaction.user.id] = message.id
 
             await interaction.response.send_message('Please check your DMs to begin playing!', ephemeral=True)
         except discord.Forbidden:
-            await interaction.response.send_message(self._getCheckErrMessage, ephemeral=True)
+            await interaction.response.send_message(self._getCheckErrMessage(), ephemeral=True)
 
     async def confirm_callback(self, interaction: discord.Interaction):
         AddPlayerButton.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Confirm add player button pressed.")
         # Remove the confirmation button regardless of success/failure
         channel = interaction.user.dm_channel
-        if channel and self.confirmMsgID != -1:
-            message = await channel.fetch_message(self.confirmMsgID)
+        messageID = self.confirmMsgIDs.pop(interaction.user.id, AddPlayerButton.__INVALID_MESSAGE_ID)
+        if channel and messageID != AddPlayerButton.__INVALID_MESSAGE_ID:
+            message = await channel.fetch_message(messageID)
             await message.delete()
-            self.confirmMsgID = -1
 
         game = GameStore().getGame(self.gameID)
         if game:
-            _ = game.addPlayer(ActionData(interaction=interaction, displayName=interaction.user.display_name))
+            _ = game.addPlayer(ActionData(interaction=interaction))
 
     def _getGreeting(self, user: discord.User) -> str:
         return f"Greetings {user.display_name}!\n" +\

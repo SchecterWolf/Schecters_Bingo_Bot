@@ -79,8 +79,6 @@ class IDiscordGraphical(ABC):
             draw.multiline_text((xPos, yPos), titleName, fill=(0, 0, 0, 255), font=fontTitle, align="center")
 
     def _convertFile(self, image: Image.Image, name: str) -> discord.File:
-        # TODO SCH If this works, redo the bingo card board images to use this method
-        # Create a discord file from the leaderboard image
         with BytesIO() as imageData:
             image.save(imageData, "PNG")
             imageData.seek(0)

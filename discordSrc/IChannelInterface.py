@@ -21,12 +21,17 @@ class ChannelView(Enum):
 
 # Duplicate guard decorator
 def verifyView(view: ChannelView):
+    async def _donothing(self, *args, **kwargs):
+        pass
+
     def decorator(fn):
         @wraps(fn)
         def wrapper(self: IChannelInterface, *args, **kwargs):
             if not self._currentView == view:
                 self._currentView = view
                 return fn(self, *args, **kwargs)
+            else:
+                return _donothing(self, *args, **kwargs)
         return wrapper
     return decorator
 

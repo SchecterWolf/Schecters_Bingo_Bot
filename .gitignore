@@ -172,7 +172,10 @@ cython_debug/
 
 *.swp
 log.txt
+config/client_secret.json
 config/token.txt
+config/token.txt.enc
+config/yt_token.json
 resources/cards/*
 resources/data/*
 

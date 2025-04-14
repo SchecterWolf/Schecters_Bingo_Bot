@@ -9,13 +9,14 @@ __email__ = "--"
 import discord
 
 from .IGameCtrlBtn import IGameCtrlBtn
+from .IGateKeeper import IGateKeeper
 
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 from discord.ui import Button, View
+from game.ActionData import ActionData
 from game.GameStore import GameStore
 
-class PauseGameButton(IGameCtrlBtn):
+class PauseGameButton(IGameCtrlBtn, IGateKeeper):
     __LOGGER = ClassLogger(__name__)
     __btn_label = "Pause Game"
     __btn_id = "pause_bingo"
@@ -32,16 +33,19 @@ class PauseGameButton(IGameCtrlBtn):
         button.callback = self.button_callback
 
         view.add_item(button)
-        view.interaction_check = self.interaction_check
+        view.interaction_check = self.interactionCheck
         self._interactExpired = False
 
     async def button_callback(self, interaction: discord.Interaction):
         PauseGameButton.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Discord pause bingo game button pressed.")
+        # Note: The button never becomes un-expired, since the button view is expected to be removed
         expired = self._interactExpired
-        self._interactExpired = True
-        await interaction.response.defer()
-
+        self.setInteractExpired()
         game = GameStore().getGame(self.gameID)
+
         if not expired and game:
-            _ = game.pause()
+            await interaction.response.defer(thinking=True)
+            _ = game.pause(ActionData(interaction=interaction))
+        else:
+            await interaction.response.send_message("Failed to process command", ephemeral=True)
 

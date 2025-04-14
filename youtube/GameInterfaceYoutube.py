@@ -9,42 +9,43 @@ __email__ = "--"
 from .ChatInterface import ChatInterface
 from .ChatProcessor import ChatProcessor
 
-from config.ClassLogger import ClassLogger
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from config.Globals import GLOBALVARS
-from config.Log import LogLevel
 
 from game.ActionData import ActionData
 from game.Bing import Bing
 from game.Binglets import Binglets
 from game.CallRequest import CallRequest
-from game.Game import Game
 from game.IGameInterface import IGameInterface
 from game.Result import Result
 
-# TODO SCH Have an independent loop listen for the '/bingo' command that prints out how to join the game
 class GameInterfaceYoutube(IGameInterface):
     __LOGGER = ClassLogger(__name__)
 
-    def __init__(self):
-        super().__init__(Game())
+    def __init__(self, game: IGameInterface):
+        super().__init__(game.game)
+        self.gameIface = game
         self.chatIface = ChatInterface()
-        self.chatProcessor = ChatProcessor(self.chatIface)
+        self.chatProcessor = ChatProcessor(game, self.chatIface)
 
     def init(self) -> Result:
-        self.chatIface.init()
-        self.chatProcessor.init()
-        return Result(True)
+        ret: Result = self.chatIface.init()
+        if ret.result:
+            self.chatProcessor.init()
+        return ret
 
     def destroy(self) -> Result:
+        # TODO SCH teardown the yt session in chatIface?
         return Result(True)
 
     def start(self) -> Result:
         GameInterfaceYoutube.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Sending start message to yt livestream.")
         message = Config().getFormatConfig("StreamerName", GLOBALVARS.GAME_MSG_STARTED)
         message += f" {GLOBALVARS.GAME_MSG_JOIN}"
-        ret = self.chatIface.sendMessage(message) and\
-                self.chatIface.sendMessage(GLOBALVARS.GAME_NIGHTBOT_CMD_DISCORD)
+        #ret = self.chatIface.sendMessage(message) and\
+        #        self.chatIface.sendMessage(GLOBALVARS.GAME_NIGHTBOT_CMD_DISCORD)
+        ret = self.chatIface.sendMessage(message)
 
         return Result(ret)
 
@@ -64,9 +65,20 @@ class GameInterfaceYoutube(IGameInterface):
         return Result(ret)
 
     def addPlayer(self, data: ActionData) -> Result:
-        GameInterfaceYoutube.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Sending add player message to yt livestream.")
-        displayName: str = data.get("displayName")
-        ret = self.chatIface.sendMessage(f"Player \"{displayName}\" has joined the livestream bingo!")
+        GameInterfaceYoutube.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Queuing add player message to yt livestream.")
+        self.chatProcessor.addNewPlayerJoined(data.get("displayName"))
+        return Result(True)
+
+    def kickPlayer(self, data: ActionData) -> Result:
+        GameInterfaceYoutube.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Sending kick player message to yt livestream.")
+        _fData = {"player": data.get("displayName")}
+        ret = self.chatIface.sendMessage(GLOBALVARS.GAME_MSG_KICKED.format(**_fData))
+        return Result(ret)
+
+    def banPlayer(self, data: ActionData) -> Result:
+        GameInterfaceYoutube.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Sending kick player message to yt livestream.")
+        _fData = {"player": data.get("displayName")}
+        ret = self.chatIface.sendMessage(GLOBALVARS.GAME_MSG_BANNED.format(**_fData))
         return Result(ret)
 
     def makeCall(self, data: ActionData) -> Result:
@@ -75,12 +87,17 @@ class GameInterfaceYoutube(IGameInterface):
         index: int = data.get("index")
         newPlayerCalls: str = data.get("newPlayerCalls")
         newPlayerBingos: str = data.get("newPlayerBingos")
-        bing: Bing = Binglets().getBingFromIndex(index)
+        bing: Bing = Binglets(self.game.gameType).getBingFromIndex(index)
 
+        # Make sure the index is associated with a valid bing
         if not bing:
             ret.responseMsg = f"Could not locate bing for index {index}"
             return ret
 
+        # Update the chat processor of the newly called bing slot
+        self.chatProcessor.addCalledSlot(index)
+
+        # Print message to stream chat
         ret.result = self.chatIface.sendMessage(f"Slot called: {bing.bingStr}")
         if newPlayerBingos:
             ret.result = ret.result and self.chatIface.sendMessage(newPlayerCalls)

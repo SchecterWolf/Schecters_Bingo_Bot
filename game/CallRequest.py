@@ -7,8 +7,7 @@ __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
 from .Player import Player
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 from game.Bing import Bing
 from typing import Set
 
@@ -20,7 +19,10 @@ class CallRequest:
         self.requestBing = requestBing
 
     def getRequesterName(self) -> str:
-        return "" if not self.players else self.getPrimaryRequester().card.getCardOwner()
+        return self.getPrimaryRequester().card.getCardOwner()
+
+    def getRequesterID(self) -> int:
+        return self.getPrimaryRequester().userID
 
     def mergeRequests(self, request: "CallRequest"):
         if not self.isMatchingRequest(request):
@@ -36,6 +38,9 @@ This requests bing index is f{self.requestBing.bingIdx} and the merge's bing ind
     def removePlayer(self, player: Player):
         self.players.discard(player)
 
+    def hasPlayer(self, player: Player):
+        return player in self.players
+
     def getPrimaryRequester(self) -> Player:
-        return Player("", -1) if not self.players else list(self.players)[0]
+        return Player("", -1) if not self.players else next(iter(self.players))
 

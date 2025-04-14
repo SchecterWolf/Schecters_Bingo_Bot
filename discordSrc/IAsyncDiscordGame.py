@@ -15,8 +15,8 @@ from game.IGameInterface import IGameInterface
 from game.Result import Result
 
 class IAsyncDiscordGame(IGameInterface):
-    def __init__(self, gameGuild: GameGuild):
-        super().__init__(Game())
+    def __init__(self, gameGuild: GameGuild, gameType: str):
+        super().__init__(Game(gameType))
         self.gameGuild = gameGuild
 
     @abstractmethod
@@ -36,11 +36,11 @@ class IAsyncDiscordGame(IGameInterface):
         pass
 
     @abstractmethod
-    async def pause(self) -> Result:
+    async def pause(self, data: ActionData) -> Result:
         pass
 
     @abstractmethod
-    async def resume(self) -> Result:
+    async def resume(self, data: ActionData) -> Result:
         pass
 
     @abstractmethod

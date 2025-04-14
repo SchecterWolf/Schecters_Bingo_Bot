@@ -19,7 +19,9 @@
             "Death by drowning",
             "Death by explosion",
             "Death by fire",
-            "Death by stabbing"
+            "Death by stabbing",
+            "Death by shooting",
+            "Death by falling"
         ],
         "Max gets...": [
             "Max gets Fini global banned",
