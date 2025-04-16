@@ -43,9 +43,10 @@ class StartGameButton(IGameCtrlBtn):
 
         expired = self._interactExpired
         self._interactExpired = True
-        await interaction.response.defer()
-
         controller = GameStore().getController()
         if not expired and controller:
+            await interaction.response.defer(thinking=True)
             _ = controller.startGame(interaction)
+        else:
+            await interaction.response.send_message("Failed to process command", ephemeral=True)
 

@@ -16,6 +16,8 @@ class IGameCtrlBtn(ABC):
         self._interactExpired = False
 
     async def interaction_check(self, interaction: discord.Interaction):
+        if self._interactExpired:
+            await interaction.response.send_message("Action is already being processed, please wait", ephemeral=True)
         return not self._interactExpired
 
     @abstractmethod

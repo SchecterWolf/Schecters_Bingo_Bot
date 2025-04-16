@@ -8,6 +8,7 @@ __email__ = "--"
 
 import copy
 import json
+import os
 
 from .Bing import Bing
 from config.ClassLogger import ClassLogger, LogLevel
@@ -64,11 +65,17 @@ class Binglets:
 
     def _loadBings(self):
         Binglets.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Reading in binglets config.")
-        if not self.bingletsFile.exists():
+        if not self.bingletsFile.exists() or not os.path.getsize(self.bingletsFile):
+            Binglets.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Binglets data file is empty or non existent, skipping load.")
             return
-        else:
-            with self.bingletsFile.open("r") as file:
+
+        # TODO SCH need to make the game type and binglets selectable. IE. running a FiveM game vs a RedM one
+        with self.bingletsFile.open("r") as file:
+            try:
                 config = json.load(file)
+            except Exception as e:
+                Binglets.__LOGGER.log(LogLevel.LEVEL_CRIT, f"Could not load binglets data file: {e}")
+                return
 
         i = 1 # Note: 0 is reserved for FREE SPACE
         for key, array in config['bings'].items():

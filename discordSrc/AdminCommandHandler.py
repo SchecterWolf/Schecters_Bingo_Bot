@@ -111,12 +111,15 @@ class AdminCommandHandler(ICommandHandler):
 
     @discord.app_commands.checks.has_role(Config().getConfig("GameMasterRole"))
     async def gameStatus(self, interaction: discord.Interaction):
+        AdminCommandHandler.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Admin command game status called.")
         # Make sure the game instance exists
         iface = GameStore().getGame(interaction.guild_id or -1)
         if not iface:
             gName = interaction.guild.name if interaction.guild else "N/A"
             await interaction.response.send_message(f"\U0000274C There is no active game for server {gName}", ephemeral=True)
             return
+
+        await interaction.response.defer(thinking=True)
 
         text = ""
         guildID = interaction.guild_id or -1
@@ -185,6 +188,8 @@ class AdminCommandHandler(ICommandHandler):
             text += ", ".join(calledSlots)
         else:
             text += "NONE"
+
+        await interaction.followup.send(text)
 
     async def _checkBotMember(self, interaction: discord.Interaction, member: discord.Member) -> bool:
         """

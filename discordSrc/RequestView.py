@@ -10,8 +10,7 @@ import discord
 
 from .IContentItem import IContentItem
 
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 from discord.ui import Button, View
 from game.ActionData import ActionData
 from game.CallRequest import CallRequest
@@ -35,7 +34,7 @@ class RequestView(View, IContentItem):
         self.interactExpired = False
 
         # Set the request caption text
-        self.viewText = MakeCallRequestNotif(request)
+        self.viewText = MakeCallRequestNotif(self.callRequest)
 
         acceptButton = Button(
             label=RequestView.__btn_accept_label,
@@ -50,6 +49,17 @@ class RequestView(View, IContentItem):
             custom_id=RequestView.__btn_reject_id)
         rejectButton.callback = self.reject_callback
         self.add_item(rejectButton)
+
+    def updateRequest(self, request: CallRequest):
+        if not self.callRequest.isMatchingRequest(request):
+            RequestView.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Cannot update request view with a different type of request. \
+This view has request ID ({self.callRequest.requestBing.bingIdx}) and the update request has ID ({request.requestBing.bingIdx})")
+            return
+
+        RequestView.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Request has {len(request.players)} players") # TODO SCH rm
+        self.callRequest = request
+        self.viewText = MakeCallRequestNotif(self.callRequest)
+        RequestView.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Request text: {self.viewText}") # TODO SCH rm
 
     async def interaction_check(self, _: discord.Interaction):
         return not self.interactExpired

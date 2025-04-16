@@ -8,6 +8,7 @@ __email__ = "--"
 
 import datetime
 import json
+import os
 
 from .Player import Player
 
@@ -147,9 +148,15 @@ class PersistentStats():
 
     def _readInPlayerData(self):
         PersistentStats.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Reading in saved player data...")
-        if self.filePlayerData.exists():
-            with self.filePlayerData.open("r") as file:
+        if not self.filePlayerData.exists() or not os.path.getsize(self.filePlayerData):
+            PersistentStats.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"player data file is empty or non existent, skipping load.")
+            return
+
+        with self.filePlayerData.open("r") as file:
+            try:
                 self.playerData = json.load(file)
+            except Exception as e:
+                PersistentStats.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Could not load player data file: {e}")
 
         self._loadPlayerData()
 

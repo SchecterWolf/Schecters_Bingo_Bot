@@ -303,7 +303,7 @@ class Game:
         ret.result = True
         ret.responseMsg = f"Request for {callRequest.requestBing.bingStr} has been made."
         if len(existingRequest.players) > 1:
-            ret.responseMsg += f"There are {len(existingRequest.players)} players with this same request."
+            ret.responseMsg += f" There are {len(existingRequest.players)} players with this same request."
         ret.additional = existingRequest
 
         Game._LOGGER.log(LogLevel.LEVEL_INFO, ret.responseMsg)
@@ -326,7 +326,7 @@ class Game:
                     ret.responseMsg = f"Call request \"{request.requestBing.bingStr}\" was removed."
                     self.requestedCalls.remove(request)
             if not removed:
-                Game._LOGGER.log(LogLevel.LEVEL_WARN, f"There is no outstanding request for index \"{index}\", skipping.")
+                Game._LOGGER.log(LogLevel.LEVEL_DEBUG, f"There is no outstanding request for index \"{index}\", skipping.")
 
         Game._LOGGER.log(LogLevel.LEVEL_INFO if ret.result else LogLevel.LEVEL_ERROR, ret.responseMsg)
         return ret
@@ -368,6 +368,16 @@ class Game:
             numReq += 1 if player in req.players else 0
 
         return numReq
+
+    def playerHasRequest(self, player: Player, bingID: int) -> bool:
+        ret = False
+
+        for rq in self.requestedCalls:
+            ret = bingID == rq.requestBing.bingIdx and player in rq.players
+            if ret:
+                break
+
+        return ret
 
     def checkEligible(self, player: Union[Player, int]) -> Result:
         ret = Result(False)

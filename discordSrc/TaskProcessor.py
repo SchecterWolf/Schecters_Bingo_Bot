@@ -39,7 +39,6 @@ class TaskUpdateUserDMs:
 
         ctx = self.player.ctx
         if isinstance(ctx, UserDMChannel):
-            TaskUpdateUserDMs.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Updating user DM channel for: {self}")
             await ctx.setBoardView()
             await ctx.refreshRequestView()
             await ctx.sendNotice(self.notifStr)
@@ -89,16 +88,22 @@ class TaskProcessor:
         # Note: Since there is only one async event loop handler (that is owned by the discord bot),
         #       this flow of control will reconverge onto the bot thread. However, this thread allows
         #       us to control when tasks get added to the loop so the discord bot can still be reactive
-        #       to other tasks during this class's processing
+        #       to other tasks during this class's processing.
+        #       We HAVE to use the same event loop, because calling into the discord api in a different
+        #       loop will cause it to throw an error
         asyncio.set_event_loop(self.loop)
         while self.running:
             task  = self.taskQueue.get() # Wait for a task to become available
             self.taskIDs.discard(self._getTaskID(task))
             if self.running:
-                TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Executing task: {task}")
+                #TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Executing task: {task}")
                 future = asyncio.run_coroutine_threadsafe(task.execTask(), self.loop)
                 future.result(timeout=5.0)
                 self.taskQueue.task_done()
+
+                # Sleep for a short amount of time so this thread doesn't "hog" the async event loop
+                # TODO SCH Can i use threading.Event ?
+                threading.Event().wait(0.1)
 
         TaskProcessor.__LOGGER.log(LogLevel.LEVEL_INFO, "Task processor thread ended.")
 

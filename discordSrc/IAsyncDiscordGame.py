@@ -36,11 +36,11 @@ class IAsyncDiscordGame(IGameInterface):
         pass
 
     @abstractmethod
-    async def pause(self) -> Result:
+    async def pause(self, data: ActionData) -> Result:
         pass
 
     @abstractmethod
-    async def resume(self) -> Result:
+    async def resume(self, data: ActionData) -> Result:
         pass
 
     @abstractmethod

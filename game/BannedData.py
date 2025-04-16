@@ -7,6 +7,7 @@ __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
 import json
+import os
 import time
 
 from config.ClassLogger import ClassLogger, LogLevel
@@ -71,10 +72,14 @@ class BannedData:
         return [int(playerID) for playerID in self.data.keys()]
 
     def _loadData(self):
-        if not self.bannedFile.exists():
+        if not self.bannedFile.exists() or not os.path.getsize(self.bannedFile):
+            BannedData.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Banned file is empty or non existent, skipping load.")
             return
 
         BannedData.__LOGGER.log(LogLevel.LEVEL_INFO, "Reading in banned player data.")
         with self.bannedFile.open("r") as file:
-            self.data = json.load(file)
+            try:
+                self.data = json.load(file)
+            except Exception as e:
+                BannedData.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Could not load banned player data file: {e}")
 

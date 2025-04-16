@@ -13,6 +13,7 @@ from .IGameCtrlBtn import IGameCtrlBtn
 from config.ClassLogger import ClassLogger
 from config.Log import LogLevel
 from discord.ui import Button, View
+from game.ActionData import ActionData
 from game.GameStore import GameStore
 
 class PauseGameButton(IGameCtrlBtn):
@@ -39,9 +40,11 @@ class PauseGameButton(IGameCtrlBtn):
         PauseGameButton.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Discord pause bingo game button pressed.")
         expired = self._interactExpired
         self._interactExpired = True
-        await interaction.response.defer()
-
         game = GameStore().getGame(self.gameID)
+
         if not expired and game:
-            _ = game.pause()
+            await interaction.response.defer(thinking=True)
+            _ = game.pause(ActionData(interaction=interaction))
+        else:
+            await interaction.response.send_message("Failed to process command", ephemeral=True)
 

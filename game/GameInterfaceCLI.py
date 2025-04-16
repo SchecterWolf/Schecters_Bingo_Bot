@@ -65,20 +65,21 @@ class GameInterfaceCLI(IGameInterface):
         ret = self.game.stopGame()
         print(ret.responseMsg)
 
-    def pause(self):
+    def pause(self, _: ActionData):
         pass
 
-    def resume(self):
+    def resume(self, _: ActionData):
         pass
 
-    def requestCall(self):
+    def requestCall(self, _: ActionData):
         pass
 
-    def deleteRequest(self):
+    def deleteRequest(self, _: ActionData):
         pass
 
-    def addPlayer(self, command):
+    def addPlayer(self, data: ActionData):
         self._logger.log(LogLevel.LEVEL_DEBUG, "AddPlayer command called")
+        command: str = data.get("command")
 
         # Get name from args
         parser = argparse.ArgumentParser(prog="AddPlayer", add_help=False)
@@ -97,10 +98,11 @@ class GameInterfaceCLI(IGameInterface):
         return self.game.kickPlayer(data.get("playerID"))
 
     def banPlayer(self, data: ActionData) -> Result:
-        return self.game.banPlayer(data.get("playerID"))
+        return self.game.banPlayer(data.get("playerID"), data.get("playerName"))
 
-    def makeCall(self, command):
+    def makeCall(self, data: ActionData):
         self._logger.log(LogLevel.LEVEL_DEBUG, "MakeCall command called")
+        command: str =  data.get("command")
         result = Result(False)
 
         parser = argparse.ArgumentParser(prog="MakeCall", add_help=False)

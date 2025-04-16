@@ -7,6 +7,7 @@ __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
 import json
+import os
 
 from config.ClassLogger import ClassLogger, LogLevel # TODO SCH Update all files to include LogLevel from the ClassLogger from
 from config.Globals import GLOBALVARS
@@ -52,10 +53,15 @@ class SavedData:
         self.data[key] = val
 
     def _loadData(self):
-        if not self.dataFile.exists():
+        if not self.dataFile.exists() or not os.path.getsize(self.dataFile):
+            SavedData.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Game data file is empty or non existent, skipping load.")
             return
 
         SavedData.__LOGGER.log(LogLevel.LEVEL_INFO, "Reading in saved game data.")
         with self.dataFile.open("r") as file:
-            self.data = json.load(file)
+            try:
+                self.data = json.load(file)
+            except Exception as e:
+                SavedData.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Could not load saved game data file: {e}")
+
 

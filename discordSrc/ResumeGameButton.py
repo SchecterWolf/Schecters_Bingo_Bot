@@ -13,6 +13,7 @@ from .IGameCtrlBtn import IGameCtrlBtn
 from config.ClassLogger import ClassLogger
 from config.Log import LogLevel
 from discord.ui import Button, View
+from game.ActionData import ActionData
 from game.GameStore import GameStore
 
 class ResumeGameButton(IGameCtrlBtn):
@@ -39,9 +40,11 @@ class ResumeGameButton(IGameCtrlBtn):
         ResumeGameButton.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Discord resume bingo game button pressed.")
         expired = self._interactExpired
         self._interactExpired = True
-        await interaction.response.defer()
-
         game = GameStore().getGame(self.gameID)
+
         if not expired and game:
-            _ = game.resume()
+            await interaction.response.defer(thinking=True)
+            _ = game.resume(ActionData(interaction=interaction))
+        else:
+            await interaction.response.send_message("Failed to process command", ephemeral=True)
 

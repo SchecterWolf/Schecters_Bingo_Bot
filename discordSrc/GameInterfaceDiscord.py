@@ -6,6 +6,7 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
+import asyncio
 import discord
 
 from .AdminChannel import AdminChannel
@@ -30,7 +31,7 @@ from game.Player import Player
 from game.Result import Result
 from game.Sync import sync_aware
 
-from typing import Set, cast
+from typing import Optional, Set, cast
 
 from youtube.GameInterfaceYoutube import GameInterfaceYoutube
 
@@ -42,6 +43,7 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         self.bot = bot
         self.initialized = False
         self.taskProcessor = TaskProcessor(self.bot.loop)
+        self.lock = asyncio.Lock()
 
         if Config().getConfig("YTChannelID") and False: # TODO SCH comment back in once im done testing the refactor
             self.YTiface = GameInterfaceYoutube()
@@ -96,6 +98,10 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         return ret
 
     async def start(self) -> Result:
+        async with self.lock:
+            return await self._start()
+
+    async def _start(self) -> Result:
         self.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Discord game interface starting.")
         ret = Result(True)
 
@@ -121,14 +127,22 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         return ret
 
     async def destroy(self) -> Result:
+        async with self.lock:
+            return await self._destroy()
+
+    async def _destroy(self) -> Result:
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_WARN, f"Guild game destroyed: {self.gameGuild.guildID}.")
-        await self.stop()
+        await self._stop()
         self.game.destroyGame()
         if self.YTiface:
             self.YTiface.destroy()
         return Result(True)
 
     async def stop(self) -> Result:
+        async with self.lock:
+            return await self._stop()
+
+    async def _stop(self) -> Result:
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_WARN, f"Stopping game for guild ID {self.gameGuild.guildID}.")
         # We have to grab the list of players before stopping the game because they get cleared
         players = self.game.getAllPlayers()
@@ -148,19 +162,41 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         return Result(True)
 
     @sync_aware
-    async def pause(self) -> Result:
+    async def pause(self, data: ActionData) -> Result:
+        async with self.lock:
+            return await self._pause(data)
+
+    async def _pause(self, data: ActionData) -> Result:
+        GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_INFO, f"Pausing bingo game.")
+        self.game.pauseGame()
         if self.YTiface:
             self.YTiface.pause()
+
+        await self._crankStateViews()
+        await self._followup(data)
         return Result(False)
 
     @sync_aware
-    async def resume(self) -> Result:
+    async def resume(self, data: ActionData) -> Result:
+        async with self.lock:
+            return await self._resume(data)
+
+    async def _resume(self, data: ActionData) -> Result:
+        GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_INFO, f"Resuming bingo game.")
+        self.game.resumeGame()
         if self.YTiface:
             self.YTiface.resume()
+
+        await self._crankStateViews()
+        await self._followup(data)
         return Result(False)
 
     @sync_aware
     async def addPlayer(self, data: ActionData) -> Result:
+        async with self.lock:
+            return await self._addPlayer(data)
+
+    async def _addPlayer(self, data: ActionData) -> Result:
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Attempting to add player...")
         ret = Result(False)
         interaction: discord.Interaction = data.get("interaction")
@@ -210,6 +246,10 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
     @sync_aware
     async def kickPlayer(self, data: ActionData) -> Result:
+        async with self.lock:
+            return await self._kickPlayer(data)
+
+    async def _kickPlayer(self, data: ActionData) -> Result:
         ret = Result(False)
         user: discord.Member = data.get("member")
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Kicking player {user.display_name} ({user.id})")
@@ -236,9 +276,12 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
     @sync_aware
     async def banPlayer(self, data: ActionData) -> Result:
+        async with self.lock:
+            return await self._banPlayer(data)
+
+    async def _banPlayer(self, data: ActionData) -> Result:
         data.add(banned=True)
-        # Invoke without the sync wrapper since we're internal and do want to block
-        await self.kickPlayer.__wrapped__(self, data)
+        await self._kickPlayer(data)
         user: discord.Member = data.get("member")
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Banning player {user.display_name} ({user.id})")
 
@@ -248,6 +291,14 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
     @sync_aware
     async def makeCall(self, data: ActionData) -> Result:
+        # TODO SCH I noticed if I make two back to back calls with many players in the game,
+        #       the second call will time out. The 1st call shouldnt take too long that
+        #       blocks all other game actions
+        # XXX Update, This is because the TaskProcessor thread is "hogging" the async event loop
+        async with self.lock:
+            return await self._makeCall(data)
+
+    async def _makeCall(self, data: ActionData) -> Result:
         index: int = data.get("index")
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Call made for index: {index}")
 
@@ -272,14 +323,16 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
                 self.taskProcessor.addTask(task)
 
             # Add the rest of the players
+            GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Adding user update tasks to queue") # TODO SCH rm
             for player in markedPlayers.difference(newBingos):
                 notifStr = f"[Slot marked] {bingStr}"
                 task = TaskUpdateUserDMs(notifStr, player)
                 self.taskProcessor.addTask(task)
+            GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Finished adding user update tasks to queue") # TODO SCH rm
 
         # Remove any matching call requests
         if ret.result:
-            await self.deleteRequest.__wrapped__(self, data)
+            await self._deleteRequest(data)
 
         # Update the bingo channel with the call notice
         newPlayerBingos = ""
@@ -302,6 +355,10 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
     @sync_aware
     async def requestCall(self, data: ActionData) -> Result:
+        async with self.lock:
+            return await self._requestCall(data)
+
+    async def _requestCall(self, data: ActionData) -> Result:
         callRequest: CallRequest = data.get("callRequest")
         # Verify initialized
         if not self.initialized and not self.channelAdmin:
@@ -327,6 +384,10 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
     @sync_aware
     async def deleteRequest(self, data: ActionData) -> Result:
+        async with self.lock:
+            return await self._deleteRequest(data)
+
+    async def _deleteRequest(self, data: ActionData) -> Result:
         index: int = data.get("index")
 
         # Verify initialized
@@ -354,15 +415,23 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
             if self.channelBingo:
                 await self.channelBingo.setViewNew()
 
-        # Setup the bingo channels to starting state
+        # Set the bingo channels to starting state
         elif gameState == GameState.STARTED and self.viewState != GameState.STARTED:
-            if self.channelAdmin:
-                await self.channelAdmin.setViewStarted()
             if self.channelBingo:
                 await self.channelBingo.setViewStarted()
-            players = self.game.getAllPlayers()
-            for player in players:
+            if self.channelAdmin:
+                await self.channelAdmin.setViewStarted()
+            for player in self.game.getAllPlayers():
                 await player.ctx.setViewStarted()
+
+        # Set the views to paused state
+        elif gameState == GameState.PAUSED and self.viewState != GameState.PAUSED:
+            if self.channelAdmin:
+                await self.channelAdmin.setViewPaused()
+            if self.channelBingo:
+                await self.channelBingo.setViewPaused()
+            for player in self.game.getAllPlayers():
+                await player.ctx.setViewPaused()
 
         # Set the views to the stopped state
         elif gameState == GameState.STOPPED:
@@ -370,6 +439,8 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
                 await self.channelAdmin.setViewStopped()
             if self.channelBingo:
                 await self.channelBingo.setViewStopped()
+            for player in self.game.getAllPlayers():
+                await player.ctx.setViewPaused()
 
         # Invalid state(s)
         else:
@@ -381,4 +452,13 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
             self.viewState = gameState
 
         return ret
+
+    async def _followup(self, data: ActionData):
+        interaction: discord.Interaction = data.get("interaction")
+        if not interaction.response.is_done():
+            return
+
+        msg: Optional[discord.WebhookMessage] = await interaction.followup.send(content=".", ephemeral=True)
+        if msg:
+            await cast(discord.WebhookMessage, msg).delete()
 

@@ -25,6 +25,9 @@ class MockUserDMChannel(UserDMChannel):
         super().__init__(-1, channel, player)
         ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, f"MockUserDMChannel created for user {player.card.getCardOwner()}")
 
+    async def sendNoticeItem(self, **kwargs):
+        pass
+
     async def removeNotice(self):
         pass
 

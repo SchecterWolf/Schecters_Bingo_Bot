@@ -34,11 +34,11 @@ class IGameInterface(ABC):
         pass
 
     @abstractmethod
-    def pause(self) -> Result:
+    def pause(self, data: ActionData) -> Result:
         pass
 
     @abstractmethod
-    def resume(self) -> Result:
+    def resume(self, data: ActionData) -> Result:
         pass
 
     @abstractmethod

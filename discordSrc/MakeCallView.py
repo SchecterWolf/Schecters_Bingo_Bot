@@ -41,6 +41,7 @@ class SelectCall(Select):
         self.min_values = 1
 
     async def callback(self, interaction: discord.Interaction):
+        # TODO SCH I need to pause the task processor to handle a new callback
         SelectCall.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Call selection made: {self.values[0]}")
         callIndex = int(self.values[0])
 

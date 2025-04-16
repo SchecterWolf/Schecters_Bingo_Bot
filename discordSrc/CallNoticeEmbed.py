@@ -21,6 +21,7 @@ class CallNoticeEmbed(Embed):
     __MAX_ROW_COUNT = 8
 
     def __init__(self, calledBing: Bing, markedPlayers: List[Player], newBingos: str):
+        # TODO SCH I noticed some players are missing who had their board barked, but not shown here...
         super().__init__()
         _iconName = os.path.basename(GLOBALVARS.IMAGE_CALL_ICON)
         self.file = discord.File(GLOBALVARS.IMAGE_CALL_ICON, filename=_iconName)

@@ -40,8 +40,11 @@ class MakeRequestView(View, IContentItem):
         MakeRequestView.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Request call selection made: {self.select.values[0]}")
 
         game = GameStore().getGame(self.gameID)
-        requestBing = self._player.card.getBingFromID(int(self.select.values[0]))
+        bingID = int(self.select.values[0])
+        requestBing = self._player.card.getBingFromID(bingID)
         maxRequestsLimit = Config().getConfig("MaxRequests", 0)
+
+        # TODO SCH Check for duplicate requesting
 
         if not game:
             await interaction.response.send_message(f"Failed to process request", ephemeral=True)
@@ -51,12 +54,13 @@ class MakeRequestView(View, IContentItem):
             await interaction.response.send_message(errStr, ephemeral=True)
         elif requestBing.marked:
             await interaction.response.send_message(f"Slot \"{requestBing.bingStr}\" has already been marked!.", ephemeral=True)
+        elif game.game.playerHasRequest(self._player, bingID):
+            await interaction.response.send_message(f"\U0000FE0F You already made a call request for '{requestBing.bingStr}'", ephemeral=True)
         elif game.game.getNumRequestByPlayer(self._player) >= maxRequestsLimit:
-            await interaction.response.send_message(f"\U0001F6D1 Request limit reached! You can only request up to {maxRequestsLimit} requests at a time.")
+            await interaction.response.send_message(f"\U0001F6D1 Request limit reached! You can only request up to {maxRequestsLimit} requests at a time.", ephemeral=True)
         else:
             await interaction.response.defer()
-            if game:
-                _ = game.requestCall(ActionData(interaction=interaction, callRequest=CallRequest(self._player, requestBing)))
+            _ = game.requestCall(ActionData(interaction=interaction, callRequest=CallRequest(self._player, requestBing)))
 
         if interaction.message:
             self.select.values.clear()

@@ -84,7 +84,7 @@ class GameControllerDiscord(IGameController):
                 GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_CRIT, "Destroying problematic game.")
                 newGame.destroy()
             # Send error message
-            await interaction.response.send_message(ret.responseMsg, ephemeral=True)
+            await interaction.followup.send(ret.responseMsg, ephemeral=True)
 
         GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_INFO if ret.result else LogLevel.LEVEL_ERROR, ret.responseMsg)
         return ret

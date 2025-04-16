@@ -52,7 +52,6 @@ def MakeCallRequestNotif(request: CallRequest) -> str:
     if len(request.players) < 2:
         reqStr += "."
     else:
-        reqStr += f" and {len(request.players) - 1} other" + "s." if len(request.players) > 2 else "."
-
+        reqStr += f" and {len(request.players) - 1} other" + ("s." if len(request.players) > 2 else ".")
     return reqStr
 

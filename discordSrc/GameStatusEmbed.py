@@ -38,15 +38,18 @@ class GameStatusEmbed(Embed):
     def __init__(self, gameID: int):
         super().__init__()
 
-        _iconName = os.path.basename(GLOBALVARS.IMAGE_BINGO_ICON)
-        self.file = discord.File(GLOBALVARS.IMAGE_BINGO_ICON, filename=_iconName)
+        self.iconName = os.path.basename(GLOBALVARS.IMAGE_BINGO_ICON)
+        self.file = discord.File(GLOBALVARS.IMAGE_BINGO_ICON, filename=self.iconName)
         self.gameID = gameID
 
         # Embed members
-        self.set_author(name=GameStatusEmbed.__STATS_EMBED_AUTHOR, icon_url=f"attachment://{_iconName}")
+        self.set_author(name=GameStatusEmbed.__STATS_EMBED_AUTHOR, icon_url=f"attachment://{self.iconName}")
         self.color = discord.Color.blue()
 
         self.refreshStats()
+
+    def reloadFile(self):
+        self.file = discord.File(GLOBALVARS.IMAGE_BINGO_ICON, filename=self.iconName)
 
     def refreshStats(self):
         GameStatusEmbed.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Refreshing active game stats embed.")
