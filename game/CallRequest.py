@@ -7,8 +7,7 @@ __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
 from .Player import Player
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 from game.Bing import Bing
 from typing import Set
 

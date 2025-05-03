@@ -7,7 +7,6 @@ __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
 import discord
-import logging # TODO SCH rm
 
 from .AdminCommandHandler import AdminCommandHandler
 from .DebugCommandHandler import DebugCommandHandler
@@ -62,8 +61,7 @@ class Bot(Client):
         tokenFile = Config().getConfig('TokenFile')
         with open(f"{GLOBALVARS.PROJ_ROOT}/{tokenFile}") as file:
             token = file.readline()
-        #self.run(token, log_level=logging.DEBUG, root_logger=True) # Blocks # TODO SCH
-        self.run(token, log_level=logging.INFO, root_logger=True) # Blocks
+        self.run(token, root_logger=True) # Blocks
 
         return True
 

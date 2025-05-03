@@ -18,9 +18,8 @@ from .MockUserDMChannel import MockUserDMChannel
 from .TaskProcessor import TaskProcessor, TaskUpdateUserDMs
 from .UserDMChannel import UserDMChannel
 
-from config.ClassLogger import ClassLogger
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
-from config.Log import LogLevel
 
 from game.ActionData import ActionData
 from game.Binglets import Binglets
@@ -163,8 +162,11 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
     @sync_aware
     async def pause(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
         async with self.lock:
-            return await self._pause(data)
+            ret = await self._pause(data)
+        self.taskProcessor.resume()
+        return ret
 
     async def _pause(self, data: ActionData) -> Result:
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_INFO, f"Pausing bingo game.")
@@ -178,8 +180,11 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
     @sync_aware
     async def resume(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
         async with self.lock:
-            return await self._resume(data)
+            ret = await self._resume(data)
+        self.taskProcessor.resume()
+        return ret
 
     async def _resume(self, data: ActionData) -> Result:
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_INFO, f"Resuming bingo game.")
@@ -193,8 +198,11 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
     @sync_aware
     async def addPlayer(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
         async with self.lock:
-            return await self._addPlayer(data)
+            ret = await self._addPlayer(data)
+        self.taskProcessor.resume()
+        return ret
 
     async def _addPlayer(self, data: ActionData) -> Result:
         GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Attempting to add player...")
@@ -246,8 +254,11 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
     @sync_aware
     async def kickPlayer(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
         async with self.lock:
-            return await self._kickPlayer(data)
+            ret = await self._kickPlayer(data)
+        self.taskProcessor.resume()
+        return ret
 
     async def _kickPlayer(self, data: ActionData) -> Result:
         ret = Result(False)
@@ -276,8 +287,11 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
     @sync_aware
     async def banPlayer(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
         async with self.lock:
-            return await self._banPlayer(data)
+            ret = await self._banPlayer(data)
+        self.taskProcessor.resume()
+        return ret
 
     async def _banPlayer(self, data: ActionData) -> Result:
         data.add(banned=True)
@@ -291,12 +305,11 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
     @sync_aware
     async def makeCall(self, data: ActionData) -> Result:
-        # TODO SCH I noticed if I make two back to back calls with many players in the game,
-        #       the second call will time out. The 1st call shouldnt take too long that
-        #       blocks all other game actions
-        # XXX Update, This is because the TaskProcessor thread is "hogging" the async event loop
+        self.taskProcessor.pause()
         async with self.lock:
-            return await self._makeCall(data)
+            ret = await self._makeCall(data)
+        self.taskProcessor.resume()
+        return ret
 
     async def _makeCall(self, data: ActionData) -> Result:
         index: int = data.get("index")
@@ -323,12 +336,10 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
                 self.taskProcessor.addTask(task)
 
             # Add the rest of the players
-            GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Adding user update tasks to queue") # TODO SCH rm
             for player in markedPlayers.difference(newBingos):
                 notifStr = f"[Slot marked] {bingStr}"
                 task = TaskUpdateUserDMs(notifStr, player)
                 self.taskProcessor.addTask(task)
-            GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Finished adding user update tasks to queue") # TODO SCH rm
 
         # Remove any matching call requests
         if ret.result:
@@ -355,8 +366,11 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
     @sync_aware
     async def requestCall(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
         async with self.lock:
-            return await self._requestCall(data)
+            ret = await self._requestCall(data)
+        self.taskProcessor.resume()
+        return ret
 
     async def _requestCall(self, data: ActionData) -> Result:
         callRequest: CallRequest = data.get("callRequest")
@@ -384,8 +398,11 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
     @sync_aware
     async def deleteRequest(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
         async with self.lock:
-            return await self._deleteRequest(data)
+            ret = await self._deleteRequest(data)
+        self.taskProcessor.resume()
+        return ret
 
     async def _deleteRequest(self, data: ActionData) -> Result:
         index: int = data.get("index")

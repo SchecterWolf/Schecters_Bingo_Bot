@@ -99,9 +99,9 @@ class GameStatusEmbed(Embed):
             val=f"\
 __**{player.name}**__\n\
 Bingos {bingos}\n\
-{GameStatusEmbed.__INLINE_SPACER_BIGGER}{bingos * bingoBonus} Pts\n\
+{GameStatusEmbed.__INLINE_SPACER_BIGGER}[{bingos * bingoBonus} Pts]\n\
 Slots Marked {slots}{GameStatusEmbed.__INLINE_SPACER}\n\
-{GameStatusEmbed.__INLINE_SPACER_BIGGER}{slots * callBonus} Pts\n\
+{GameStatusEmbed.__INLINE_SPACER_BIGGER}[{slots * callBonus} Pts]\n\
 **{player.points[PersistentStats.ITEM_TOTAL]} Pts Total**"
             self.add_field(name=f"{GameStatusEmbed.__ORDINAL_EMOJI[index]} {GameStatusEmbed.__ORDINALS[index]} Player",
                            value=val, inline=True)

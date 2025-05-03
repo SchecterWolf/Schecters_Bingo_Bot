@@ -11,9 +11,8 @@ import textwrap
 from PIL import Image, ImageDraw, ImageFont
 
 from config.Config import Config
-from config.ClassLogger import ClassLogger
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Globals import GLOBALVARS
-from config.Log import LogLevel
 
 from game.Card import Card
 from io import BytesIO

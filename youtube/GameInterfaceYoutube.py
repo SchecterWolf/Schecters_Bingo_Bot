@@ -9,10 +9,9 @@ __email__ = "--"
 from .ChatInterface import ChatInterface
 from .ChatProcessor import ChatProcessor
 
-from config.ClassLogger import ClassLogger
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from config.Globals import GLOBALVARS
-from config.Log import LogLevel
 
 from game.ActionData import ActionData
 from game.Bing import Bing

@@ -18,8 +18,7 @@ from .PersistentStats import PersistentStats
 from .Player import Player
 from .Result import Result
 
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 
 from typing import cast
 

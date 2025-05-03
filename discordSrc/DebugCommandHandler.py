@@ -91,7 +91,7 @@ class DebugCommandHandler(ICommandHandler):
         DebugCommandHandler.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Slash command bulkAddPlayers called")
         mockPlayers = ["Elephant", "Tiger", "Whale", "Eagle", "Panda", "Shark", "Leopard", "Kangaroo", "Anaconda", "Penguin",
                        "Giraffe", "Frog", "Fox", "Dragon", "Cobra", "Bison", "Kingfisher", "Squid", "Mandrill", "Okapi", "Axolotl",
-                       "Tasmanian Devil", "Badger", "Dog", "Crab", "Narwal", "Cat", "Quokka"]
+                       "Tasmanian Devil", "Badger", "Dog", "Crab", "Narwal", "Cat", "Quokka", "Fish", "Dove"]
 
         # Make sure game instance exists
         game = await self._getGame(interaction)

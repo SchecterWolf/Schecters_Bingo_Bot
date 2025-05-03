@@ -18,7 +18,6 @@ from config.Config import Config
 from config.Globals import GLOBALVARS
 from io import BytesIO
 from typing import Optional
-from config.ClassLogger import ClassLogger, LogLevel # TODO SCH rm
 
 class BingoChannel(IChannelInterface):
     __MSG_ADD_PLAYER = "addplayer"
@@ -41,7 +40,6 @@ class BingoChannel(IChannelInterface):
 
     @verifyView(ChannelView.STARTED)
     async def setViewStarted(self):
-        ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, f"setViewStarted called")
         self.showAddBtn = True
         self.gameStatus.reloadFile()
 
@@ -81,10 +79,8 @@ class BingoChannel(IChannelInterface):
 
     async def _getLeaderBoardFile(self, forceRefresh: bool = False) -> discord.File:
         if self.cachedLeaderboard and not forceRefresh:
-            ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, f"Returning cached leaderboard")
             fileLeaderBoard = discord.File(BytesIO(self.cachedLeaderboard), filename=self.cachedFilename)
         else:
-            ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, f"Creating new leaderboard")
             fileLeaderBoard = await self.leaderboard.createAsset()
             fileLeaderBoard.fp.seek(0)
             self.cachedLeaderboard = fileLeaderBoard.fp.read()

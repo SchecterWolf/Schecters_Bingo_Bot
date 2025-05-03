@@ -9,7 +9,7 @@ __email__ = "--"
 import json
 import os
 
-from config.ClassLogger import ClassLogger, LogLevel # TODO SCH Update all files to include LogLevel from the ClassLogger from
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Globals import GLOBALVARS
 from pathlib import Path
 from typing import Optional

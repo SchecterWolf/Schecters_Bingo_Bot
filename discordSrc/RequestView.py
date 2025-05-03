@@ -56,10 +56,8 @@ class RequestView(View, IContentItem):
 This view has request ID ({self.callRequest.requestBing.bingIdx}) and the update request has ID ({request.requestBing.bingIdx})")
             return
 
-        RequestView.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Request has {len(request.players)} players") # TODO SCH rm
         self.callRequest = request
         self.viewText = MakeCallRequestNotif(self.callRequest)
-        RequestView.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Request text: {self.viewText}") # TODO SCH rm
 
     async def interaction_check(self, _: discord.Interaction):
         return not self.interactExpired

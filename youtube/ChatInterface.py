@@ -6,9 +6,8 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
-from config.ClassLogger import ClassLogger
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
-from config.Log import LogLevel
 
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build

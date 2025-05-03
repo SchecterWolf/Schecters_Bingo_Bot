@@ -11,8 +11,7 @@ import threading
 
 from .UserDMChannel import UserDMChannel
 
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 
 from game.Player import Player
 from queue import Queue
@@ -52,17 +51,19 @@ class TaskProcessor:
     __LOGGER = ClassLogger(__name__)
 
     def __init__(self, loop: asyncio.AbstractEventLoop):
+        self.event = threading.Event()
         self.loop = loop
         self.processorThread = threading.Thread(target=self._threadEntry)
         self.running = False
-        self.taskQueue: Queue[TaskUpdateUserDMs] = Queue()
         self.taskIDs: set[str] = set()
+        self.taskQueue: Queue[TaskUpdateUserDMs] = Queue()
 
     def init(self):
         if self.running:
             return
 
         self.running = True
+        self.resume()
         self.processorThread.start()
 
     def stop(self):
@@ -71,6 +72,7 @@ class TaskProcessor:
             return
 
         self.running = False
+        self.resume()
         self.taskQueue.put(TaskUpdateUserDMs("", None)) # Unblock the processor thread
         self.processorThread.join()
 
@@ -81,6 +83,18 @@ class TaskProcessor:
             TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Adding new task to processor queue: {task}")
             self.taskIDs.add(taskID)
             self.taskQueue.put(task)
+
+    def pause(self):
+        if not self.running:
+            return
+
+        self.event.clear()
+
+    def resume(self):
+        if not self.running:
+            return
+
+        self.event.set()
 
     def _threadEntry(self):
         TaskProcessor.__LOGGER.log(LogLevel.LEVEL_INFO, "Task processor thread running.")
@@ -96,14 +110,18 @@ class TaskProcessor:
             task  = self.taskQueue.get() # Wait for a task to become available
             self.taskIDs.discard(self._getTaskID(task))
             if self.running:
-                #TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Executing task: {task}")
+                self.event.wait()
+
                 future = asyncio.run_coroutine_threadsafe(task.execTask(), self.loop)
-                future.result(timeout=5.0)
+                try:
+                    future.result(timeout=5.0)
+                except Exception as e:
+                    TaskProcessor.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Task {task} failed to execute in an acceptable amount of time.")
                 self.taskQueue.task_done()
 
                 # Sleep for a short amount of time so this thread doesn't "hog" the async event loop
-                # TODO SCH Can i use threading.Event ?
-                threading.Event().wait(0.1)
+                # TODO SCH Try without using explicit wait
+                #threading.Event().wait(0.1)
 
         TaskProcessor.__LOGGER.log(LogLevel.LEVEL_INFO, "Task processor thread ended.")
 

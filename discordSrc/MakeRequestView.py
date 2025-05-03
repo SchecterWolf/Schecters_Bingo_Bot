@@ -45,6 +45,7 @@ class MakeRequestView(View, IContentItem):
         maxRequestsLimit = Config().getConfig("MaxRequests", 0)
 
         # TODO SCH Check for duplicate requesting
+        # TODO SCH Add a restriction where if two back-to-back requests are rejected, time out for 10 minutes
 
         if not game:
             await interaction.response.send_message(f"Failed to process request", ephemeral=True)
@@ -53,11 +54,11 @@ class MakeRequestView(View, IContentItem):
             MakeRequestView.__LOGGER.log(LogLevel.LEVEL_ERROR, errStr)
             await interaction.response.send_message(errStr, ephemeral=True)
         elif requestBing.marked:
-            await interaction.response.send_message(f"Slot \"{requestBing.bingStr}\" has already been marked!.", ephemeral=True)
+            await interaction.response.send_message(f"Slot \"{requestBing.bingStr}\" has already been marked!. If the square is not red, please wait for the board to update.", ephemeral=True)
         elif game.game.playerHasRequest(self._player, bingID):
             await interaction.response.send_message(f"\U0000FE0F You already made a call request for '{requestBing.bingStr}'", ephemeral=True)
         elif game.game.getNumRequestByPlayer(self._player) >= maxRequestsLimit:
-            await interaction.response.send_message(f"\U0001F6D1 Request limit reached! You can only request up to {maxRequestsLimit} requests at a time.", ephemeral=True)
+            await interaction.response.send_message(f"\U0001F6D1 Request limit reached! You can only have up to {maxRequestsLimit} active requests at a time.", ephemeral=True)
         else:
             await interaction.response.defer()
             _ = game.requestCall(ActionData(interaction=interaction, callRequest=CallRequest(self._player, requestBing)))

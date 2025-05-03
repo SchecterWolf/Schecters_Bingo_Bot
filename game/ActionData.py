@@ -8,8 +8,7 @@ __email__ = "--"
 
 import sys
 
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 from typing import Any
 
 class ActionData:

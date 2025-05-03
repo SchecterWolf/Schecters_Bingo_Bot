@@ -6,6 +6,7 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
+import asyncio
 import time
 
 from .UserDMChannel import UserDMChannel
@@ -47,5 +48,5 @@ class MockUserDMChannel(UserDMChannel):
         pass
 
     async def setBoardView(self):
-        time.sleep(1.9)
+        await asyncio.sleep(1.9)
 

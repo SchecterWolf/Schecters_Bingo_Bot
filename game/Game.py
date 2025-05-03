@@ -328,7 +328,8 @@ class Game:
             if not removed:
                 Game._LOGGER.log(LogLevel.LEVEL_DEBUG, f"There is no outstanding request for index \"{index}\", skipping.")
 
-        Game._LOGGER.log(LogLevel.LEVEL_INFO if ret.result else LogLevel.LEVEL_ERROR, ret.responseMsg)
+        if ret.responseMsg:
+            Game._LOGGER.log(LogLevel.LEVEL_INFO if ret.result else LogLevel.LEVEL_ERROR, ret.responseMsg)
         return ret
 
     def getPlayer(self, playerName: str) -> Result:

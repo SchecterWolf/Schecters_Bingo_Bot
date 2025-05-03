@@ -71,7 +71,6 @@ class AdminChannel(IChannelInterface):
 
         # Update the request view, or add a new one if necessary
         if requestView:
-            AdminChannel.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Update request has players: {[pl.card.getCardOwner() for pl in request.players]}") # TODO SCH RM
             requestView.updateRequest(request)
         else:
             requestView = RequestView(self.gameID, request)

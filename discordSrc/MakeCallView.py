@@ -10,8 +10,7 @@ import discord
 
 from .IContentItem import IContentItem
 
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 from discord.ui import Select, View
 from game.ActionData import ActionData
 from game.Bing import Bing
@@ -41,7 +40,6 @@ class SelectCall(Select):
         self.min_values = 1
 
     async def callback(self, interaction: discord.Interaction):
-        # TODO SCH I need to pause the task processor to handle a new callback
         SelectCall.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Call selection made: {self.values[0]}")
         callIndex = int(self.values[0])
 

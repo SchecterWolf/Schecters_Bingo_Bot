@@ -125,11 +125,6 @@ class CLIBootstrap:
             self.commands["printcard"][CLIBootstrap._IDX_CALLBACK] = self.game.debugPrintCard
             self.commands["showbings"][CLIBootstrap._IDX_CALLBACK] = self.game.debugShowBings
 
-        # TODO SCH rm
-        #self.game.addPlayer(["addplayer", "wolf"])
-        #self.game.debugShowCard(["addplayer", "wolf"])
-        #self.game.debugPrintCard(["addplayer", "wolf"])
-
     def stop(self, command):
         if not self.game:
             errStr = "No game is running, skipping."

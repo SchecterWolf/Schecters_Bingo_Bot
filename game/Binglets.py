@@ -41,7 +41,7 @@ class Binglets:
                 for bng in array:
                     Binglets.__bings_ary.append(bng)
 
-        return copy.copy(Binglets.__bings_ary)
+        return copy.deepcopy(Binglets.__bings_ary)
 
     def getBingDict(self) -> Dict[str, List[Bing]]:
         # Get the configured binglets, if we haven't already

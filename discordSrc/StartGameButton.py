@@ -10,8 +10,7 @@ import discord
 
 from .IGameCtrlBtn import IGameCtrlBtn
 
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 from discord.ui import Button, View
 from game.GameStore import GameStore
 

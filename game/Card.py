@@ -34,6 +34,7 @@ class Card:
         Creates a new randomized bingo card for a player and returns
         a unique hash ID for the particular card arrangement.
         """
+        Card._LOGGER.log(LogLevel.LEVEL_DEBUG, f"Generating card for player {self.playername}...")
         # Get the configured card size if we haven't already
         if Card._cardSize == 0:
             Card._LOGGER.log(LogLevel.LEVEL_DEBUG, "Reading in card size config.")
@@ -175,7 +176,7 @@ class Card:
                 if index == cell.bingIdx:
                     found = cell
                     break
-            if found.marked:
+            if found.bingStr:
                 break
 
         return found

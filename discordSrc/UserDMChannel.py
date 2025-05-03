@@ -12,10 +12,9 @@ import os
 from .IChannelInterface import IChannelInterface, ChannelView, verifyView
 from .MakeRequestView import MakeRequestView
 
-from config.ClassLogger import ClassLogger
+from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from config.Globals import GLOBALVARS
-from config.Log import LogLevel
 from discord.channel import DMChannel
 from game.CardImgCreator import CardImgCreator
 from game.Player import Player
