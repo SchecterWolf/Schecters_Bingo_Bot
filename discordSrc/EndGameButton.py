@@ -9,13 +9,13 @@ __email__ = "--"
 import discord
 
 from .IGameCtrlBtn import IGameCtrlBtn
+from .IGateKeeper import IGateKeeper
 
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
+from config.ClassLogger import ClassLogger, LogLevel
 from discord.ui import Button, View
 from game.GameStore import GameStore
 
-class EndGameButton(IGameCtrlBtn):
+class EndGameButton(IGameCtrlBtn, IGateKeeper):
     __LOGGER = ClassLogger(__name__)
     __btn_label = "End Game"
     __btn_id ="end_bingo"
@@ -31,8 +31,7 @@ class EndGameButton(IGameCtrlBtn):
         button.callback = self.button_callback
 
         view.add_item(button)
-        view.interaction_check = self.interaction_check
-        self._interactExpired = False
+        view.interaction_check = self.interactionCheck
 
     async def button_callback(self, interaction: discord.Interaction):
         EndGameButton.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Discord end bingo game button pressed.")
@@ -40,11 +39,15 @@ class EndGameButton(IGameCtrlBtn):
             await interaction.response.send_message("Invalid interaction arg.", ephemeral=True)
             return
 
-        expired = self._interactExpired
-        self._interactExpired = True
-        await interaction.response.defer()
-
         controller = GameStore().getController()
+
+        # Note: The button never becomes un-expired, since the button view is expected to be removed
+        expired = self._interactExpired
+        self.setInteractExpired()
+
         if not expired and controller:
+            await interaction.response.defer(thinking=True)
             _ = controller.stopGame(interaction.guild_id)
+        else:
+            await interaction.response.send_message("Failed to process command", ephemeral=True)
 

@@ -8,6 +8,7 @@ __email__ = "--"
 
 import datetime
 import json
+import os
 
 from .Player import Player
 
@@ -45,8 +46,8 @@ def CanonicalCType(cType: str) -> str:
 
 class PlayerOrdinal:
     def __init__(self, playerID: int, name: str = "", ):
-        self.playerID = playerID
-        self.name = name
+        self.playerID: int = playerID
+        self.name: str = name
 
         self.stats: dict[str, TypeDataStat] = {}
         self.points: dict[str, int] = {}
@@ -94,7 +95,7 @@ class PersistentStats():
 
             playerName = player.card.getCardOwner()
             playerID = player.userID
-            playerStatData: TypePlayerData = self._getPlayerStats(playerID)
+            playerStatData: TypePlayerData = self._getPlayerStats(playerID, playerName)
 
             for cType in PersistentStats.LIST_CATEGORY_ITEMS:
                 stat = cast(TypeDataStat, playerStatData[cType])
@@ -111,7 +112,7 @@ class PersistentStats():
                 # Update games played
                 stat[PersistentStats.DATA_ITEM_GAMES] += 1
 
-            self.playerData[playerName] = playerStatData
+            self.playerData[str(playerID)] = playerStatData
 
         # Update the internal top players
         self._loadPlayerData()
@@ -120,10 +121,9 @@ class PersistentStats():
         self._save()
 
     def removePlayer(self, playerID: int):
-        ID = str(playerID)
-        if ID in self.playerData:
+        if playerID in self.playerData:
             PersistentStats.__LOGGER.log(LogLevel.LEVEL_INFO, f"Player ID {playerID} has been removed from saved player data.")
-            self.playerData.pop(ID, None)
+            self.playerData.pop(playerID, None)
             self._loadPlayerData()
             self._save()
 
@@ -147,9 +147,15 @@ class PersistentStats():
 
     def _readInPlayerData(self):
         PersistentStats.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Reading in saved player data...")
-        if self.filePlayerData.exists():
-            with self.filePlayerData.open("r") as file:
+        if not self.filePlayerData.exists() or not os.path.getsize(self.filePlayerData):
+            PersistentStats.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"player data file is empty or non existent, skipping load.")
+            return
+
+        with self.filePlayerData.open("r") as file:
+            try:
                 self.playerData = json.load(file)
+            except Exception as e:
+                PersistentStats.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Could not load player data file: {e}")
 
         self._loadPlayerData()
 
@@ -203,11 +209,11 @@ class PersistentStats():
             idx = index + 1
         leaderboard.insert(idx, player)
 
-    def _getPlayerStats(self, playerID: int) -> TypePlayerData:
+    def _getPlayerStats(self, playerID: int, playerName: str = "") -> TypePlayerData:
         ret: dict = self.playerData.get(str(playerID), dict())
 
         if not ret:
-            ret[PersistentStats.ITEM_NAME] = ""
+            ret[PersistentStats.ITEM_NAME] = playerName
             ret.update(PlayerOrdinal(-1).stats)
 
         return ret

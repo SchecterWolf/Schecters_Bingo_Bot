@@ -9,40 +9,13 @@ __email__ = "--"
 import asyncio
 import threading
 
-from .UserDMChannel import UserDMChannel
-
-from config.ClassLogger import ClassLogger
-from config.Log import LogLevel
-
+from .TaskUpdateUserDMs import TaskUpdateUserDMs
+from .TaskUserDMs import TaskUserDMs
+from config.ClassLogger import ClassLogger, LogLevel
 from game.Player import Player
+
 from queue import Queue
-from typing import Optional
-
-# For now we just have one task that this processor can handle,
-# But is we end up with more, break this out into their own classes
-class TaskUpdateUserDMs:
-    __LOGGER = ClassLogger(__name__)
-
-    def __init__(self, notifStr: str, player: Optional[Player]):
-        self.notifStr = notifStr
-        self.player = player
-
-    def __str__(self) -> str:
-        playerName = self.player.card.getCardOwner() if self.player else ""
-        return f" Update \"{playerName}\" DM"
-
-    async def execTask(self):
-        if not self.player or not self.player.valid:
-            name = self.player.card.getCardOwner() if self.player else ""
-            TaskUpdateUserDMs.__LOGGER.log(LogLevel.LEVEL_WARN, f"Skipping task for invalid user {name}")
-            return
-
-        ctx = self.player.ctx
-        if isinstance(ctx, UserDMChannel):
-            TaskUpdateUserDMs.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Updating user DM channel for: {self}")
-            await ctx.setBoardView()
-            await ctx.refreshRequestView()
-            await ctx.sendNotice(self.notifStr)
+from typing import Dict, List
 
 class TaskProcessor:
     """
@@ -53,17 +26,19 @@ class TaskProcessor:
     __LOGGER = ClassLogger(__name__)
 
     def __init__(self, loop: asyncio.AbstractEventLoop):
+        self.event = threading.Event()
         self.loop = loop
         self.processorThread = threading.Thread(target=self._threadEntry)
         self.running = False
-        self.taskQueue: Queue[TaskUpdateUserDMs] = Queue()
-        self.taskIDs: set[str] = set()
+        self.taskIDs: Dict[str, List[TaskUserDMs]] = dict()
+        self.taskQueue: Queue[TaskUserDMs] = Queue()
 
     def init(self):
         if self.running:
             return
 
         self.running = True
+        self.resume()
         self.processorThread.start()
 
     def stop(self):
@@ -72,17 +47,53 @@ class TaskProcessor:
             return
 
         self.running = False
-        self.taskQueue.put(TaskUpdateUserDMs("", None)) # Unblock the processor thread
+        self.resume()
+        self.taskQueue.put(TaskUpdateUserDMs("", Player("", 0))) # Unblock the processor thread
         self.processorThread.join()
-        TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Task processor signaled to shut down.") # TODO SCH rm
 
-    # Adds a task to the process queue only if a task of the same type isnt already queued
-    def addTask(self, task: TaskUpdateUserDMs):
+    # Adds a task to the process queue only if a task of the same type isn't already queued
+    def addTask(self, task: TaskUserDMs):
+        if not self.running:
+            return
+
+        # Note: These aren't technically needed because the python GIL will only execute one
+        #       critical section at a time. But i'll still add these for best practice.
+        self.pause()
+
+        addTask = False
         taskID = self._getTaskID(task)
-        if self.running and taskID not in self.taskIDs:
+        # Always add the task if the taskID has not already been added
+        if taskID not in self.taskIDs:
+            addTask = True
+            self.taskIDs[taskID] = [task]
+        # If there is already CHANGE_STATE tasks associated with the user, invalidate all the
+        # queued tasks, since the most recent STATE is what should be honored.
+        elif task.getType() == TaskUserDMs.TaskType.CHANGE_STATE:
+            addTask = True
+            for subtask in self.taskIDs[taskID]:
+                subtask.setNoOp()
+            self.taskIDs[taskID].append(task)
+        # There only needs to be one UPDATE task per user, so skip
+        else:
+            TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Skipping redundant update task: {taskID}")
+
+        if addTask:
             TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Adding new task to processor queue: {task}")
-            self.taskIDs.add(taskID)
             self.taskQueue.put(task)
+
+        self.resume()
+
+    def pause(self):
+        if not self.running:
+            return
+
+        self.event.clear()
+
+    def resume(self):
+        if not self.running:
+            return
+
+        self.event.set()
 
     def _threadEntry(self):
         TaskProcessor.__LOGGER.log(LogLevel.LEVEL_INFO, "Task processor thread running.")
@@ -90,20 +101,30 @@ class TaskProcessor:
         # Note: Since there is only one async event loop handler (that is owned by the discord bot),
         #       this flow of control will reconverge onto the bot thread. However, this thread allows
         #       us to control when tasks get added to the loop so the discord bot can still be reactive
-        #       to other tasks during this class's processing
+        #       to other tasks during this class's processing.
+        #       We HAVE to use the same event loop, because calling into the discord api in a different
+        #       loop will cause it to throw an error
         asyncio.set_event_loop(self.loop)
+
         while self.running:
+            self.event.wait()
+
             task  = self.taskQueue.get() # Wait for a task to become available
-            self.taskIDs.discard(self._getTaskID(task))
-            if self.running:
-                TaskProcessor.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Executing task: {task}")
-                future = asyncio.run_coroutine_threadsafe(task.execTask(), self.loop)
-                future.result(timeout=5.0)
-                self.taskQueue.task_done()
+            self.taskIDs.pop(self._getTaskID(task), None)
+
+            # Run the task, unless it's marked as noOp
+            if self.running and not task.getNoOp():
+                self._runTask(task)
+
+            self.taskQueue.task_done()
 
         TaskProcessor.__LOGGER.log(LogLevel.LEVEL_INFO, "Task processor thread ended.")
 
-    def _getTaskID(self, task: TaskUpdateUserDMs) -> str:
-        pID = str(task.player.userID) if task.player else ""
-        return task.__class__.__name__ + pID
+    def _runTask(self, task: TaskUserDMs):
+        future = asyncio.run_coroutine_threadsafe(task.execTask(), self.loop)
+        future.result(timeout=10)
+
+    def _getTaskID(self, task: TaskUserDMs) -> str:
+        pID = str(task.getPlayer().userID)
+        return str(task.getType()) + pID
 

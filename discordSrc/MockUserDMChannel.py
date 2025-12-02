@@ -6,6 +6,7 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
+import asyncio
 import time
 
 from .UserDMChannel import UserDMChannel
@@ -25,24 +26,29 @@ class MockUserDMChannel(UserDMChannel):
         super().__init__(-1, channel, player)
         ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, f"MockUserDMChannel created for user {player.card.getCardOwner()}")
 
+    async def sendNoticeItem(self, **kwargs):
+        pass
+
     async def removeNotice(self):
         pass
 
     async def setViewNew(self):
-        time.sleep(0.25)
+        pass
 
     async def setViewStarted(self):
-        time.sleep(0.25)
+        await asyncio.sleep(2.0)
 
     async def setViewPaused(self):
-        time.sleep(0.25)
+        await asyncio.sleep(1.0)
 
     async def setViewStopped(self):
-        time.sleep(0.30)
+        await asyncio.sleep(0.5)
 
     async def refreshRequestView(self):
         pass
 
     async def setBoardView(self):
-        time.sleep(1.9)
+        ClassLogger(__name__).log(LogLevel.LEVEL_DEBUG, f"setBoardView called for Mock user channel: {self.player.card.getCardOwner()}")
+        time.sleep(1)
+        await asyncio.sleep(0.5)
 

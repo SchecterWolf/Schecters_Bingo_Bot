@@ -38,17 +38,20 @@ class PlayerCommandHandler(ICommandHandler):
             Command(
                 name="rank",
                 description="Get player game rank",
-                callback=self.playerRank
+                callback=self.playerRank,
+                allowed_contexts=self.appContext
             ),
             Command(
                 name="leaderboard",
                 description="Show the game leaderboard",
-                callback=self.leaderboard
+                callback=self.leaderboard,
+                allowed_contexts=self.appContext
             ),
             Command(
                 name="stats",
                 description="Get detailed player game stats",
-                callback=self.stats
+                callback=self.stats,
+                allowed_contexts=self.appContext
             )
         ]
 
@@ -62,7 +65,6 @@ class PlayerCommandHandler(ICommandHandler):
 
         # Make sure the guild instance exists
         if not guild:
-            await interaction.response.send_message("\U00002753 Error processing command.")
             return
 
         # Send back in-work response
@@ -84,14 +86,13 @@ class PlayerCommandHandler(ICommandHandler):
         PlayerCommandHandler.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Slash command leaderboard (high scores) called.")
         guild: Optional[GameGuild] = await self._getGuild(interaction)
 
+        # Make sure the guild instance exists
+        if not guild:
+            return
+
         # This is an expensive command, so disable during a running game
         if GameStore().getGame(interaction.guild_id or -1):
             await interaction.response.send_message("\U00002753 Leaderboard command is disabled while a game is running.")
-            return
-
-        # Make sure the guild instance exists
-        if not guild:
-            await interaction.response.send_message("\U00002753 Error processing command.")
             return
 
         # Make sure group is valid
@@ -117,7 +118,6 @@ class PlayerCommandHandler(ICommandHandler):
 
         # Make sure the guild instance exists
         if not guild:
-            await interaction.response.send_message("\U00002753 Error processing command.")
             return
 
         if not playerOrd:
@@ -140,7 +140,7 @@ class PlayerCommandHandler(ICommandHandler):
 
         if not guild:
             gName = interaction.guild.name if interaction.guild else "N/A"
-            await interaction.response.send_message(f"\U0000274C There is no server registered for \"{gName}\"")
+            await interaction.response.send_message(f"\U0000274C There is no server registered for \"{gName}\"", ephemeral=True)
 
         return guild
 

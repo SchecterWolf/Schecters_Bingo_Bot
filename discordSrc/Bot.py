@@ -7,7 +7,6 @@ __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
 import discord
-import logging # TODO SCH rm
 
 from .AdminCommandHandler import AdminCommandHandler
 from .DebugCommandHandler import DebugCommandHandler
@@ -26,6 +25,7 @@ from discord.client import Client
 from discord.ui import View
 
 from game.GameStore import GameStore
+from game.IGameInterface import IGameInterface
 from game.PersistentStats import PersistentStats
 
 from typing import Optional
@@ -62,8 +62,7 @@ class Bot(Client):
         tokenFile = Config().getConfig('TokenFile')
         with open(f"{GLOBALVARS.PROJ_ROOT}/{tokenFile}") as file:
             token = file.readline()
-        #self.run(token, log_level=logging.DEBUG, root_logger=True) # Blocks # TODO SCH
-        self.run(token, log_level=logging.INFO, root_logger=True) # Blocks
+        self.run(token, root_logger=True) # Blocks
 
         return True
 
@@ -86,6 +85,8 @@ class Bot(Client):
         for cmds in self.slashCommands:
             cmds.setupCommands(self.tree)
         # Apparently this only has to be done once to register the commands
+        # TODO make this automatic. have it touch a file in the config dir once it
+        # registers the slash commands
         if False:
             print("SLASH COMMANDS SYNCING")
             try:
@@ -145,8 +146,21 @@ class Bot(Client):
         """
         Called whenever this bot is removed from a discord server
         """
-        # TODO SCH Stop any games associated with this guild and then remove from gameGuilds
-        pass
+        Bot.__LOGGER.log(LogLevel.LEVEL_WARN, f"Guild signaled for removal: {guild.name}.")
+        gg: Optional[GameGuild] = self.gameGuilds.pop(guild.id, None)
+        activeGame: Optional[IGameInterface] = None
+
+        if not gg:
+            Bot.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Could not find guild \"{guild.name}\" for removal.")
+        else:
+            activeGame = GameStore().getGame(guild.id)
+
+        if activeGame:
+            Bot.__LOGGER.log(LogLevel.LEVEL_WARN, f"Force shutting down active game for guild \"{guild.name}\"...")
+            activeGame.destroy()
+
+        if gg:
+            Bot.__LOGGER.log(LogLevel.LEVEL_WARN, f"Guild \"{guild.name}\" has been removed.")
 
     async def on_disconnect(self):
         Bot.__LOGGER.log(LogLevel.LEVEL_CRIT, "Bot has been disconnected.")

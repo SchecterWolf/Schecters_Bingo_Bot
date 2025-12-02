@@ -13,10 +13,6 @@ from abc import ABC, abstractmethod
 class IGameCtrlBtn(ABC):
     def __init__(self):
         super().__init__()
-        self._interactExpired = False
-
-    async def interaction_check(self, interaction: discord.Interaction):
-        return not self._interactExpired
 
     @abstractmethod
     def addToView(self, view: discord.ui.View):
