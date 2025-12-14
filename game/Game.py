@@ -82,6 +82,9 @@ class Game:
             self._resetGame()
             self.state = GameState.STARTED
 
+            if self.persistentStats:
+                self.persistentStats.refresh()
+
             ret.result = True
             ret.responseMsg = "A new bingo game has been started."
 
@@ -101,6 +104,7 @@ class Game:
 
         if self.persistentStats:
             self.persistentStats.updateFromPlayers(self.getAllPlayers())
+
         self._resetGame()
         self.state = GameState.STOPPED
 

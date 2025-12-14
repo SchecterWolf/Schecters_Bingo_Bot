@@ -58,7 +58,7 @@ class BingoChannel(IChannelInterface):
     async def setViewStopped(self):
         self.showAddBtn = False
         await self._purgeChannel()
-        await self._updateChannelItem(BingoChannel.__MSG_GLOBAL_STATS, file=await self._getLeaderBoardFile(True))
+        await self._updateChannelItem(BingoChannel.__MSG_GLOBAL_STATS, content=GLOBALVARS.GAME_MSG_STARTUP, file=await self._getLeaderBoardFile(True))
 
         self.gameStatus.conclude()
         await self._updateChannelItem(BingoChannel.__MSG_GAME_STATUS, embed=self.gameStatus)

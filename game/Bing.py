@@ -8,9 +8,10 @@ __email__ = "--"
 
 class Bing:
     """POD for a particular bing (Bingo cell)"""
-    def __init__(self, bingStr: str, bingIdx: int):
+    def __init__(self, bingStr: str, bingIdx: int, category: str = ""):
         self.bingStr = bingStr
         self.bingIdx = bingIdx
+        self.category = category
         self.marked = False
         self.x = 0
         self.y = 0

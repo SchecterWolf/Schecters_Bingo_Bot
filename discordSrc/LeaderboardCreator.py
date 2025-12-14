@@ -68,10 +68,9 @@ class LeaderboardCreator(IDiscordGraphical):
         # Create the user avatar layer
         canvas = Image.new("RGBA", leaderboardGraphic.size, (255, 255, 255, 255))
         for ordinal in list(range(0, 3)):
-            player = self.globalStats.getTopPlayer(ordinal + 1)
-            if player:
-                avatar = await self._getDiscordAvatar(player, LeaderboardCreator.__AVATAR_SIZE)
-                canvas.paste(avatar, (self.avatarOffsets[ordinal], LeaderboardCreator.__AVATAR_YPOS), avatar)
+            player = self.globalStats.getTopPlayer(ordinal + 1) or PlayerOrdinal(-1, "NA")
+            avatar = await self._getDiscordAvatar(player, LeaderboardCreator.__AVATAR_SIZE)
+            canvas.paste(avatar, (self.avatarOffsets[ordinal], LeaderboardCreator.__AVATAR_YPOS), avatar)
 
         # Overlay the leaderboard graphic on top of the avatar layer
         leaderboardGraphic = Image.alpha_composite(canvas, leaderboardGraphic)
@@ -80,7 +79,12 @@ class LeaderboardCreator(IDiscordGraphical):
         draw = ImageDraw.Draw(leaderboardGraphic)
         for ordinal in list(range(0, 3)):
             player = self.globalStats.getTopPlayer(ordinal + 1)
-            if player:
+            if not player:
+                self._drawTitleName(draw, "N/A", self.fontName,
+                                    fontSize=(LeaderboardCreator.__FONT_SIZE_TITLE, LeaderboardCreator.__FONT_SIZE_TITLE_MIN),
+                                    pos=(self.columnsOffsets[ordinal], LeaderboardCreator.__BOARD_TITLE_HEIGHT),
+                                    sizeMax=(LeaderboardCreator.__BOARD_SLATE_WIDTH, LeaderboardCreator.__TITLE_HEIGHT_MAX))
+            else:
                 wrappedName = textwrap.fill(player.name,
                                             width=LeaderboardCreator.__TITLE_CHAR_ROW_MAX,
                                             break_long_words=True,

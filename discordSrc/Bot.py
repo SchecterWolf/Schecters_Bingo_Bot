@@ -20,6 +20,7 @@ from .StartGameButton import StartGameButton
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from config.Globals import GLOBALVARS
+from config.Version import BOT_VERSION
 
 from discord.client import Client
 from discord.ui import View
@@ -32,7 +33,6 @@ from typing import Optional
 
 class Bot(Client):
     __LOGGER = ClassLogger(__name__)
-    __STARTUP_MSG = "Schecter's Bingo Bot started!"
     __instance = None
 
     def __new__(cls, *args, **kwargs):
@@ -50,6 +50,7 @@ class Bot(Client):
         intents.message_content = True
         intents.guilds = True
         intents.dm_messages = True
+        intents.members = True
         super().__init__(intents=intents)
 
         self.gameGuilds: dict[int, GameGuild] = {}
@@ -109,14 +110,14 @@ class Bot(Client):
         starting up
         """
         Bot.__LOGGER.log(LogLevel.LEVEL_INFO, f"Initializing guild: {guild.name}")
-        persistentStats = PersistentStats()
+        persistentStats = PersistentStats(guild.id)
 
         # Get the regular bingo channel
         try:
             channelBingo = discord.utils.get(guild.text_channels, name=GLOBALVARS.CHANNEL_BINGO)
             if channelBingo:
                 await channelBingo.purge()
-                await channelBingo.send(Bot.__STARTUP_MSG, file=await LeaderboardCreator(self, persistentStats).createAsset())
+                await channelBingo.send(GLOBALVARS.GAME_MSG_STARTUP, file=await LeaderboardCreator(self, persistentStats).createAsset())
         except Exception as e:
             self.__LOGGER.log(LogLevel.LEVEL_CRIT, f"Could not set up bingo channel for guild {guild.id}: {e}")
             return
@@ -132,7 +133,7 @@ class Bot(Client):
                 startView = View(timeout=None)
                 startButton = StartGameButton()
                 startButton.addToView(startView)
-                await channelAdmin.send(Bot.__STARTUP_MSG, view=startView)
+                await channelAdmin.send(GLOBALVARS.GAME_MSG_STARTUP, view=startView)
         except Exception as e:
             self.__LOGGER.log(LogLevel.LEVEL_CRIT, f"Could not set up admin channel for guild \"{guild.name}\" ({guild.id}): {e}")
             if channelBingo:
@@ -162,6 +163,7 @@ class Bot(Client):
         if gg:
             Bot.__LOGGER.log(LogLevel.LEVEL_WARN, f"Guild \"{guild.name}\" has been removed.")
 
+    # Note: This also gets called when the SDK times out client side
     async def on_disconnect(self):
         Bot.__LOGGER.log(LogLevel.LEVEL_CRIT, "Bot has been disconnected.")
 

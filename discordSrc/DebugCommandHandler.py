@@ -8,6 +8,7 @@ __email__ = "__"
 
 import aiohttp
 import discord
+import json
 
 from .ICommandHandler import ICommandHandler
 
@@ -64,6 +65,12 @@ class DebugCommandHandler(ICommandHandler):
                 name="get_board",
                 description="[DEBUG] Get the board slots for a player",
                 callback=self.getBoard,
+                allowed_contexts=self.appContext
+            ),
+            Command(
+                name="show_config",
+                description="Shows current the configuration for the bot",
+                callback=self.showConfig,
                 allowed_contexts=self.appContext
             )
         ]
@@ -172,6 +179,13 @@ class DebugCommandHandler(ICommandHandler):
         file = discord.File(CardImgCreator().createGraphicalCard(player.card), filename)
 
         await interaction.followup.send(f"Board slots for player {player.card.getCardOwner()}:\n " + ",  ".join(slots), file=file, ephemeral=True)
+
+    @discord.app_commands.checks.has_role(Config().getConfig("GameMasterRole"))
+    async def showConfig(self, interaction: discord.Interaction):
+        DebugCommandHandler.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Slash command showConfig with guild id: {interaction.guild_id}.")
+
+        conf = Config().__config
+        await interaction.response.send_message(json.dumps(conf, indent=4))
 
     async def _getGame(self, interaction: discord.Interaction) -> Optional[IGameInterface]:
         game = GameStore().getGame(interaction.guild_id or -1)

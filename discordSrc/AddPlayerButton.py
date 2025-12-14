@@ -11,6 +11,7 @@ import discord
 from .IContentItem import IContentItem
 
 from config.ClassLogger import ClassLogger, LogLevel
+from config.Config import Config
 from discord.ui import View, Button
 from game.ActionData import ActionData
 from game.GameStore import GameStore
@@ -58,6 +59,19 @@ class AddPlayerButton(View, IContentItem):
         if not iface:
             await interaction.response.send_message("No game seems to be running, try again later", ephemeral=True)
             return
+
+        # Make sure the player has a role that's allowed to play
+        rolesAllowed = Config().getConfig("RolesPlayable", [])
+        member = interaction.guild.get_member(interaction.user.id) if interaction.guild else None
+        if rolesAllowed and member:
+            hasRole = False
+            for roleName in rolesAllowed:
+                hasRole = any(roleName == role.name for role in member.roles)
+                if hasRole:
+                    break
+            if not hasRole:
+                await interaction.response.send_message("Sorry, you do not have the needed role to play the LiveStream Bingo.", ephemeral=True)
+                return
 
         # Check if the player is eligible
         res = iface.game.checkEligibleFromID(interaction.user.display_name, interaction.user.id)

@@ -16,7 +16,7 @@ from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from config.Globals import GLOBALVARS
 from game.CallRequest import CallRequest
-from typing import List
+from typing import List, Optional
 
 class AdminChannel(IChannelInterface):
     __LOGGER = ClassLogger(__name__)
@@ -43,14 +43,14 @@ class AdminChannel(IChannelInterface):
         await self.removeNotice()
         self.gameControls.setControllsState(GameControlState.RUNNING)
         await self._updateChannelItem(AdminChannel.__MSG_GAME_CONTROLS, content=self.gameControls.msgStr, view=self.gameControls)
-        await self._updateChannelItem(AdminChannel.__MSG_MAKE_CALL, content=self.callView.msgStr, view=self.callView)
+        await self._addAllCallViews()
         await self._addAllRequestViews()
 
     @verifyView(ChannelView.PAUSED)
     async def setViewPaused(self):
         self.gameControls.setControllsState(GameControlState.PAUSED)
         await self._updateChannelItem(AdminChannel.__MSG_GAME_CONTROLS, content=self.gameControls.msgStr, view=self.gameControls)
-        await self._deleteChannelItem(AdminChannel.__MSG_MAKE_CALL)
+        await self._delAllCallViews()
         await self._delAllRequestViews()
         await self.sendNotice(Config().getFormatConfig("StreamerName", GLOBALVARS.GAME_MSG_PAUSED))
 
@@ -96,6 +96,18 @@ class AdminChannel(IChannelInterface):
         # Remove the necessary request views from the channel
         for req in removedViews:
             await self._deleteChannelItem(req.viewID)
+
+    async def _addAllCallViews(self):
+        cv: Optional[MakeCallView] = self.callView
+        while cv:
+            await self._updateChannelItem(AdminChannel.__MSG_MAKE_CALL + str(id(cv)), content=cv.msgStr, view=cv)
+            cv = cv.getCascadedCallView()
+
+    async def _delAllCallViews(self):
+        cv: Optional[MakeCallView] = self.callView
+        while cv:
+            await self._deleteChannelItem(AdminChannel.__MSG_MAKE_CALL + str(id(cv)))
+            cv = cv.getCascadedCallView()
 
     async def _addAllRequestViews(self):
         for req in self.requestsViews:

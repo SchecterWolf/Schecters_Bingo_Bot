@@ -8,6 +8,7 @@ __email__ = "--"
 
 import discord
 
+from .Decorators import require_gamemaster
 from .IGameCtrlBtn import IGameCtrlBtn
 from .IGateKeeper import IGateKeeper
 
@@ -52,6 +53,7 @@ class StartGameButton(IGameCtrlBtn, IGateKeeper):
 
         view.interaction_check = self.interactionCheck
 
+    @require_gamemaster
     async def button_callback(self, interaction: discord.Interaction):
         StartGameButton.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Discord start bingo game button pressed.")
         if not interaction.guild:
