@@ -32,7 +32,7 @@ def MakePlayersCallNotif(players: List[Player], maxMention: int = MARKED_PLAYER_
 
         remaining = len(players) - len(markedListPlayers)
         if remaining > 0:
-            markedPlayers += " +{remaining} other{'s' if remaining > 1 else ''}"
+            markedPlayers += f" +{remaining} other{'s' if remaining > 1 else ''}"
         markedPlayers += f" marked their card{'s' if len(players) > 1 else ''}!"
 
     return markedPlayers if markedPlayers else "No players had this slot on their cards!"
@@ -49,7 +49,7 @@ def MakePlayersBingoNotif(players: List[Player]) -> str:
 
 def MakeCallRequestNotif(request: CallRequest, includeID = False) -> str:
     if includeID:
-        reqStr = f"Slot \"[{request.requestBing.bingIdx}]{request.requestBing.bingStr}\" is requested by {request.getPrimaryRequester().card.getCardOwner()}"
+        reqStr = f"Slot \"[{request.requestBing.bingIdx}] {request.requestBing.bingStr}\" is requested by {request.getPrimaryRequester().card.getCardOwner()}"
     else:
         reqStr = f"Slot \"{request.requestBing.bingStr}\" is requested by {request.getPrimaryRequester().card.getCardOwner()}"
     if len(request.players) < 2:

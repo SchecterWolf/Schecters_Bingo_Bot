@@ -8,6 +8,7 @@ __email__ = "--"
 
 import discord
 
+from .Decorators import require_gamemaster
 from .IContentItem import IContentItem
 from .IGateKeeper import IGateKeeper
 
@@ -62,6 +63,7 @@ This view has request ID ({self.callRequest.requestBing.bingIdx}) and the update
         self.callRequest = request
         self.viewText = MakeCallRequestNotif(self.callRequest)
 
+    @require_gamemaster
     async def accept_callback(self, interaction: discord.Interaction):
         RequestView.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Accept request button pressed.")
         # Note: The button never becomes un-expired, since the button view is expected to be removed
@@ -73,6 +75,7 @@ This view has request ID ({self.callRequest.requestBing.bingIdx}) and the update
         if not expired and game:
             _ = game.makeCall(ActionData(interaction=interaction, index=self.callRequest.requestBing.bingIdx))
 
+    @require_gamemaster
     async def reject_callback(self, interaction: discord.Interaction):
         RequestView.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Reject request button pressed.")
         # Note: The button never becomes un-expired, since the button view is expected to be removed

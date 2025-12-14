@@ -39,11 +39,16 @@ class Binglets:
 
         self._binglets: Dict[str, List[Bing]] = {}
         self._bings_ary: List[Bing] = []
+        self._limits: Dict[str, int] = {}
 
         if bType == GLOBALVARS.GAME_TYPE_DEFAULT:
             self.bingletsFile = Path(GLOBALVARS.FILE_CONFIG_BINGLETS)
         else:
             self.bingletsFile = Path(f"{GLOBALVARS.DIR_CONFIG}/{bType}.json")
+
+    def reset(self):
+        self._binglets = {}
+        self._bings_ary = []
 
     def getBingletsCopy(self) -> List[Bing]:
         if not self._bings_ary:
@@ -64,6 +69,11 @@ class Binglets:
         if not self._binglets:
             self._loadBings()
         return len(self._binglets)
+
+    def getLimits(self) -> Dict[str, int]:
+        if not self._binglets:
+            self._loadBings()
+        return copy.deepcopy(self._limits)
 
     def getBingFromIndex(self, index: int) -> Bing:
         ret = Bing("", -1)
@@ -99,8 +109,10 @@ class Binglets:
         for key, array in config['bings'].items():
             _bings: List[Bing] = []
             for bstr in array:
-                _bings.append(Bing(bstr, i))
+                _bings.append(Bing(bstr, i, key))
                 i+=1
             self._binglets[key] = _bings
+
+        self._limits = config.get('limits', {})
         Binglets.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Binglets successfully parsed.")
 

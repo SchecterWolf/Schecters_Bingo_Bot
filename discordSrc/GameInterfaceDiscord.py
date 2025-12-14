@@ -48,14 +48,20 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         self.bot = bot
         self.initialized = False
         self.taskProcessor = TaskProcessor(self.bot.loop)
-        self.mee6Controller = Mee6Controller(gameGuild.channelAdmin)
+        self.mee6Controller: Optional[Mee6Controller] = None
         self.lock = asyncio.Lock()
         self.YTiface: Optional[GameInterfaceYoutube] = None
         self.channelAdmin = None
         self.channelBingo = None
 
+        Config().resetConfig()
+        Binglets(gameType).reset()
+
         if Config().getConfig("YTEnabled", False):
             self.YTiface = GameInterfaceYoutube(self)
+
+        if Config().getConfig("EXPEnabled", False):
+            self.mee6Controller = Mee6Controller(gameGuild.channelAdmin)
 
         # Game view states
         self.viewState = GameState.NEW
@@ -176,13 +182,15 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
         if self.YTiface:
             self.YTiface.stop()
-        await self._crankStateViews()
 
         # Update the user DM views
         for player in players:
             self.taskProcessor.addTask(TaskStopUserDMs(player))
 
-        await self.mee6Controller.issueEXP(players)
+        if self.mee6Controller:
+            await self.mee6Controller.issueEXP(players)
+
+        await self._crankStateViews()
 
         # Stop the task processor
         self.taskProcessor.stop()
@@ -426,7 +434,7 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
         # Send notification to the YT livestream
         if ret.result and self.YTiface:
-            newPlayerCalls = MakePlayersCallNotif(list(markedPlayers), 4)
+            newPlayerCalls = MakePlayersCallNotif(list(markedPlayers), 2)
             data = ActionData(index=index, newPlayerCalls=newPlayerCalls, newPlayerBingos=newPlayerBingos)
             self.YTiface.makeCall(data)
 

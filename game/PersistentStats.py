@@ -7,21 +7,19 @@ __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
 import datetime
-import json
-import os
+import sqlite3
 
 from .Player import Player
 
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from config.Globals import GLOBALVARS
-from game.SavedData import SavedData
-from pathlib import Path
-from typing import Deque, Dict, List, Optional, Union, cast
+from typing import Dict, List, Optional, cast
 
-TypeDataStat = Dict[str, int]
-TypePlayerData = Dict[str, Union[str, TypeDataStat]]
-TypePlayerEntry = Dict[str, TypePlayerData]
+DType = str
+CType = str
+TypeDataStat = Dict[DType, int]
+TypePlayerData = Dict[CType, TypeDataStat]
 
 # TODO This isn't a good practice to define the keys like this, since it diverges from the
 #       "single source-of-truth" in the PersistentStats... But I cant forward declare in
@@ -43,15 +41,18 @@ def CanonicalCType(cType: str) -> str:
     }
     return typeCanon.get(cType, "")
 
-
 class PlayerOrdinal:
     def __init__(self, playerID: int, name: str = "", ):
+        self.dbID: Optional[int] = None
         self.playerID: int = playerID
+        self.guildid = 0
         self.name: str = name
+        self.timestampMonth = 0
+        self.timestampWeek = 0
 
-        self.stats: dict[str, TypeDataStat] = {}
-        self.points: dict[str, int] = {}
-        self.ranks: dict[str, int] = {}
+        self.stats: TypePlayerData = {}
+        self.points: dict[CType, int] = {}
+        self.ranks: dict[CType, int] = {}
 
         for cType in PersistentStats.LIST_CATEGORY_ITEMS:
             self.stats[cType] = {}
@@ -63,7 +64,6 @@ class PlayerOrdinal:
 class PersistentStats():
     __LOGGER = ClassLogger(__name__)
 
-    ITEM_NAME = "name"
     ITEM_TOTAL = "total"
     ITEM_MONTH = "month"
     ITEM_WEEK = "week"
@@ -75,156 +75,199 @@ class PersistentStats():
     LIST_DATA_ITEMS = [DATA_ITEM_BINGOS, DATA_ITEM_CALLS, DATA_ITEM_GAMES]
     LIST_CATEGORY_ITEMS = [ITEM_TOTAL, ITEM_MONTH, ITEM_WEEK]
 
-    def __init__(self):
-        self.topPlayers: dict[str, Deque[PlayerOrdinal]] = {
-            PersistentStats.ITEM_TOTAL: Deque(),
-            PersistentStats.ITEM_MONTH: Deque(),
-            PersistentStats.ITEM_WEEK: Deque(),
-        }
-        self.filePlayerData = Path(GLOBALVARS.FILE_PLAYER_DATA)
-        self.playerData: TypePlayerEntry = dict()
+    def __init__(self, guildID: int):
+        self.guildID = guildID
+        self.allPlayers: List[PlayerOrdinal] = []
+        self.cachedLeaders: Dict[CType, List[PlayerOrdinal]] = {}
 
-        self._readInPlayerData()
+        self.refresh()
 
     def updateFromPlayers(self, players: List[Player]):
         PersistentStats.__LOGGER.log(LogLevel.LEVEL_INFO, "Updating player game data.")
 
+        currentWeekID = datetime.date.today().isocalendar()[1]
+        currentMonthID = datetime.date.today().month
+
         for player in players:
-            if player.userID < 0:
+            if player.userID < 0 and not Config().getConfig("Debug", False):
                 continue
 
             playerName = player.card.getCardOwner()
             playerID = player.userID
-            playerStatData: TypePlayerData = self._getPlayerStats(playerID, playerName)
+            playerOrd: Optional[PlayerOrdinal] = self.getPlayer(playerID)
 
+            # Add to player list if they are a new player
+            if not playerOrd:
+                playerOrd = PlayerOrdinal(playerID, playerName)
+                playerOrd.guildid = self.guildID
+                playerOrd.timestampMonth = currentMonthID
+                playerOrd.timestampWeek = currentWeekID
+                self.allPlayers.append(playerOrd)
+
+            # Update the player stats
+            playerStatData: TypePlayerData = playerOrd.stats
             for cType in PersistentStats.LIST_CATEGORY_ITEMS:
-                stat = cast(TypeDataStat, playerStatData[cType])
+                stat = cast(TypeDataStat, playerStatData.setdefault(cType, dict()))
 
                 # Update bingos
                 if player.card.hasBingo():
-                    stat[PersistentStats.DATA_ITEM_BINGOS] += 1
+                    stat[PersistentStats.DATA_ITEM_BINGOS] = 1 + stat.get(PersistentStats.DATA_ITEM_BINGOS, 0)
 
                 # Update num calls
                 numCalls = player.card.getNumMarked()
                 if numCalls:
-                    stat[PersistentStats.DATA_ITEM_CALLS] += numCalls
+                    stat[PersistentStats.DATA_ITEM_CALLS] = numCalls + stat.get(PersistentStats.DATA_ITEM_CALLS, 0)
 
                 # Update games played
-                stat[PersistentStats.DATA_ITEM_GAMES] += 1
+                stat[PersistentStats.DATA_ITEM_GAMES] = 1 + stat.get(PersistentStats.DATA_ITEM_GAMES, 0)
 
-            self.playerData[str(playerID)] = playerStatData
+            self._calculateBonus(playerOrd)
 
         # Update the internal top players
-        self._loadPlayerData()
+        self._loadPlayerRanks()
 
         # Save player data to file
         self._save()
 
     def removePlayer(self, playerID: int):
-        if playerID in self.playerData:
+        player = self.getPlayer(playerID)
+        if player:
             PersistentStats.__LOGGER.log(LogLevel.LEVEL_INFO, f"Player ID {playerID} has been removed from saved player data.")
-            self.playerData.pop(playerID, None)
-            self._loadPlayerData()
-            self._save()
+
+            self.allPlayers.remove(player)
+            self._loadPlayerRanks()
+
+            # Remove player from DB
+            conn = sqlite3.connect(GLOBALVARS.FILE_GAME_DB)
+            cur = conn.cursor()
+            cur.execute("DELETE FROM PLAYERS WHERE userid = ? AND guildid = ?", (playerID, self.guildID))
+            conn.commit()
+            conn.close()
 
     def getTopPlayer(self, place: int, category: str = ITEM_TOTAL) -> Optional[PlayerOrdinal]:
-        ret = None
-        leaderboard = self.topPlayers.get(category)
-        if leaderboard and place - 1 < len(leaderboard):
-            ret = leaderboard[place -1]
-        return ret
+        leaderboard = self.getAllPlayers(category)
+        return leaderboard[place -1] if (place - 1) < len(leaderboard) else None
 
     def getPlayer(self, playerID: int) -> Optional[PlayerOrdinal]:
-        ret = None
-        for player in self.topPlayers.get(PersistentStats.ITEM_TOTAL) or []:
-            if playerID == player.playerID:
-                ret = player
-                break
-        return ret
+        return next((player for player in self.allPlayers if player.playerID == playerID), None)
 
-    def getAllPlayers(self, cType: str) -> Deque[PlayerOrdinal]:
-        return self.topPlayers.get(cType, Deque())
+    def getAllPlayers(self, cType: str) -> List[PlayerOrdinal]:
+        # Populate the leaders if there is no cache for the CType
+        leaderboard: List[PlayerOrdinal] = self.cachedLeaders.setdefault(cType, [])
+        if not leaderboard:
+            leaderboard = sorted(self.allPlayers, key=lambda p: p.points[cType], reverse=True)
+        return leaderboard
+
+    def refresh(self):
+        self.allPlayers: List[PlayerOrdinal] = []
+        self._readInPlayerData()
 
     def _readInPlayerData(self):
-        PersistentStats.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Reading in saved player data...")
-        if not self.filePlayerData.exists() or not os.path.getsize(self.filePlayerData):
-            PersistentStats.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"player data file is empty or non existent, skipping load.")
-            return
+        """
+        Reads in the player data from the database
+        """
+        PersistentStats.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Reading in saved player data from the DB...")
 
-        with self.filePlayerData.open("r") as file:
-            try:
-                self.playerData = json.load(file)
-            except Exception as e:
-                PersistentStats.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Could not load player data file: {e}")
-
-        self._loadPlayerData()
-
-    def _loadPlayerData(self):
         currentWeekID = datetime.date.today().isocalendar()[1]
         currentMonthID = datetime.date.today().month
-        savedWeekID = int(SavedData().getData("weekID") or 0)
-        savedMonthID = int(SavedData().getData("monthID") or 0)
 
-        # Clear out top players
+        conn = sqlite3.connect(GLOBALVARS.FILE_GAME_DB)
+        cur = conn.cursor()
+
+        cur.execute("SELECT id, userid, name, guildid, timestampmonth, timestampweek, bingos, calls, games"
+                    + ", bingosmonth, callsmonth, gamesmonth"
+                    + ", bingosweek, callsweek, gamesweek"
+                    + f"  FROM PLAYERS WHERE guildid = {self.guildID}")
+        rows = cur.fetchall()
+
+        for row in rows:
+            pd = PlayerOrdinal(row[1], row[2])
+            pd.dbID = row[0]
+            pd.guildid = row[3]
+            pd.timestampMonth = row[4]
+            pd.timestampWeek = row[5]
+            pd.stats[PersistentStats.ITEM_TOTAL][PersistentStats.DATA_ITEM_BINGOS] = row[6]
+            pd.stats[PersistentStats.ITEM_TOTAL][PersistentStats.DATA_ITEM_CALLS] = row[7]
+            pd.stats[PersistentStats.ITEM_TOTAL][PersistentStats.DATA_ITEM_GAMES] = row[8]
+            if currentMonthID != pd.timestampMonth:
+                pd.timestampMonth = currentMonthID
+            else:
+                pd.stats[PersistentStats.ITEM_MONTH][PersistentStats.DATA_ITEM_BINGOS] = row[9]
+                pd.stats[PersistentStats.ITEM_MONTH][PersistentStats.DATA_ITEM_CALLS] = row[10]
+                pd.stats[PersistentStats.ITEM_MONTH][PersistentStats.DATA_ITEM_GAMES] = row[11]
+            if currentWeekID != pd.timestampWeek:
+                pd.timestampWeek = currentWeekID
+            else:
+                pd.stats[PersistentStats.ITEM_WEEK][PersistentStats.DATA_ITEM_BINGOS] = row[12]
+                pd.stats[PersistentStats.ITEM_WEEK][PersistentStats.DATA_ITEM_CALLS] = row[13]
+                pd.stats[PersistentStats.ITEM_WEEK][PersistentStats.DATA_ITEM_GAMES] = row[14]
+
+            self._calculateBonus(pd)
+            self.allPlayers.append(pd)
+
+        self._loadPlayerRanks()
+        conn.close()
+
+    def _loadPlayerRanks(self):
+        self.cachedLeaders = {}
+
         for cType in PersistentStats.LIST_CATEGORY_ITEMS:
-            self.topPlayers[cType].clear()
-
-        # Populate the top players
-        for key, val in self.playerData.items():
-            playerID: int = int(key)
-            name: str = cast(str, val[PersistentStats.ITEM_NAME])
-            player = PlayerOrdinal(playerID, name)
-
-            for cType in PersistentStats.LIST_CATEGORY_ITEMS:
-                # Null out the month/week stats if we're currently elapsed
-                stats:TypeDataStat = cast(TypeDataStat, val[cType])
-                if (cType == PersistentStats.ITEM_MONTH and currentMonthID > savedMonthID)\
-                    or (cType == PersistentStats.ITEM_WEEK and currentWeekID > savedWeekID):
-                    stats = cast(TypeDataStat, self._getPlayerStats(-1)[cType])
-                self._processStats(player, cType, stats)
-
-        # Set player rank value
-        for cType in PersistentStats.LIST_CATEGORY_ITEMS:
-            for idx, player in enumerate(self.topPlayers[cType]):
+            for idx, player in enumerate(self.getAllPlayers(cType)):
                 if player.points[cType] > 0:
                     player.ranks[cType] = idx + 1
                 else:
                     player.ranks[cType] = 0
 
-    def _processStats(self, player: PlayerOrdinal, cType: str, stats: TypeDataStat):
-        for dType in PersistentStats.LIST_DATA_ITEMS:
-            val = stats.get(dType, 0)
-            player.stats[cType][dType] = val
-            player.points[cType] += val * GetBonus(dType)
-
-        leaderboard = self.topPlayers[cType]
-        if not leaderboard:
-            leaderboard.appendleft(player)
-            return
-
-        idx = 0
-        for index, qStat in enumerate(leaderboard):
-            if player.points[cType] >= qStat.points[cType]:
-                break
-            idx = index + 1
-        leaderboard.insert(idx, player)
-
-    def _getPlayerStats(self, playerID: int, playerName: str = "") -> TypePlayerData:
-        ret: dict = self.playerData.get(str(playerID), dict())
-
-        if not ret:
-            ret[PersistentStats.ITEM_NAME] = playerName
-            ret.update(PlayerOrdinal(-1).stats)
-
-        return ret
+    def _calculateBonus(self, player: PlayerOrdinal):
+        for cType in PersistentStats.LIST_CATEGORY_ITEMS:
+            player.points[cType] = 0
+            for dType in PersistentStats.LIST_DATA_ITEMS:
+                val = player.stats[cType].get(dType, 0)
+                player.points[cType] += val * GetBonus(dType)
 
     def _save(self):
-        # Save the new updated stats
-        with self.filePlayerData.open("w") as file:
-            json.dump(self.playerData, file, indent=4)
-            PersistentStats.__LOGGER.log(LogLevel.LEVEL_INFO, "Player data saved.")
+        conn = sqlite3.connect(GLOBALVARS.FILE_GAME_DB)
+        cur = conn.cursor()
 
-        # Save timestamps
-        SavedData().saveData("weekID", str(datetime.date.today().isocalendar()[1]))
-        SavedData().saveData("monthID", str(datetime.date.today().month))
+        for pd in self.allPlayers:
+            data = {
+                "userid": pd.playerID,
+                "guildid": pd.guildid,
+                "name": pd.name,
+                "timestampmonth": pd.timestampMonth,
+                "timestampweek": pd.timestampWeek,
+            }
+
+            # Add in the player stats to the data container
+            for cType in PersistentStats.LIST_CATEGORY_ITEMS:
+                for dType in PersistentStats.LIST_DATA_ITEMS:
+                    suffix = "" if cType == PersistentStats.ITEM_TOTAL else cType
+                    data[f"{dType}{suffix}"] = pd.stats[cType][dType]
+
+            sql = ""
+            values = list(data.values())
+            if not pd.dbID:
+                columns = ", ".join(data.keys())
+                placeholders = ", ".join(["?"] * len(data))
+                sql = f"""
+                INSERT INTO PLAYERS ({columns})
+                VALUES ({placeholders})
+                """
+            else:
+                updateColumns = ", ".join(f"{k}=?" for k in data.keys())
+                values.append(pd.dbID)
+                sql = f"""
+                UPDATE PLAYERS
+                SET {updateColumns}
+                WHERE id=?
+                """
+
+            cur.execute(sql, values)
+            if not pd.dbID:
+                pd.dbID = cur.lastrowid
+
+        conn.commit()
+        conn.close()
+
+        PersistentStats.__LOGGER.log(LogLevel.LEVEL_INFO, "Player data saved.")
 

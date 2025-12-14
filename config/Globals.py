@@ -8,6 +8,8 @@ __email__ = "--"
 
 from pathlib import Path
 
+from .Version import BOT_VERSION
+
 class GLOBALVARS:
     PROJ_ROOT = str(Path(__file__).parent.parent)
 
@@ -17,9 +19,7 @@ class GLOBALVARS:
 
     FILE_CONFIG_GENERAL = DIR_CONFIG + "/config.json"
     FILE_CONFIG_BINGLETS = DIR_CONFIG + "/binglets.json"
-    FILE_BANNED_DATA = DIR_DATA + "/banned.json"
-    FILE_GAME_DATA = DIR_DATA + "/game.json"
-    FILE_PLAYER_DATA = DIR_DATA + "/players.json"
+    FILE_GAME_DB = DIR_DATA + "/data.sqlite"
 
     IMAGE_BINGO_ICON = DIR_RESOURCES + "/assets/BingoIcon.png"
     IMAGE_CALL_ICON = DIR_RESOURCES + "/assets/CallIcon.png"
@@ -35,6 +35,7 @@ class GLOBALVARS:
     CHANNEL_BINGO = "bingo" # TODO SCH change these to use the config instead
     CHANNEL_ADMIN_BINGO ="bingo-admin"
 
+    GAME_MSG_STARTUP = f"Schecter's Bingo Bot ready.\n{BOT_VERSION}"
     GAME_MSG_ENDED = "{StreamerName} livestream bingo has ended."
     GAME_MSG_PAUSED = "{StreamerName} livestream bingo game is paused."
     GAME_MSG_RESUMED = "{StreamerName} livestream bingo game has been resumed."

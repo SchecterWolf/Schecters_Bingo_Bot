@@ -3,9 +3,12 @@
         "Characters": [
             "Playing as a biker",
             "Playing as a gangster",
+            "Playing as character \"Agnes\"",
             "Playing as character \"Cletus\"",
+            "Playing as character \"Dante\"",
             "Playing as character \"Floyd\"",
             "Playing as character \"Lil D\"",
+            "Playing as character \"Mascot\"",
             "Playing as character \"Megaphone\"",
             "Playing as character \"Montez\"",
             "Playing as character \"Mort\"",
@@ -15,38 +18,95 @@
             "Playing as new character"
         ],
         "Deaths": [
+            "Beat to death",
             "Death by animal",
+            "Death by car crash",
             "Death by drowning",
             "Death by explosion",
+            "Death by falling",
             "Death by fire",
-            "Death by stabbing",
             "Death by shooting",
-            "Death by falling"
+            "Death by stabbing",
+            "Starves to death"
         ],
-        "Max gets...": [
+        "Max Gets...": [
+            "Banned from server",
+            "Max get arrested",
+            "Max gets pocket wiped",
+            "Max crashes out",
             "Max gets Fini global banned",
             "Max gets RDMed",
             "Max gets VDMed",
+            "Max gets jailed",
+            "Max gets political",
             "Max gets recognized in game",
-            "Jett appears on stream",
-            "Max crashes out"
+            "Max goes on a rant",
+            "Stream sniped (bad)"
+        ],
+        "Max Does...": [
+            "Argues with someone in chat",
+            "Cheat loots trunk",
+            "Max Drinks a soda on stream",
+            "Max Eats on stream",
+            "Max VDMs player",
+            "Max blicks player",
+            "Max commits mass RDM",
+            "Max gets someone arrested",
+            "Max goes OOC",
+            "Max ocean dumps car",
+            "Max ocean dumps player",
+            "Max spits some rhymes",
+            "Max stabs player",
+            "Max uses camera prop",
+            "RPG used",
+            "Sniper used",
+            "Throws grenades",
+            "Throws molly"
+        ],
+        "Players": [
+            "Cringe E-couple spotted",
+            "E-Arby's visible",
+            "ERP spotted",
+            "F8 Gang!",
+            "Furry in stream",
+            "Meta-gamer",
+            "Player claims harassment",
+            "Player crashes out",
+            "Player cries",
+            "Player locked out of their car",
+            "Player makes a ticket",
+            "Racist player",
+            "SIMP spotted",
+            "White knight spotted"
+        ],
+        "Gameplay": [
+            "Admin sit",
+            "Blinks spotted",
+            "Cheeto spotted",
+            "Cop injustice",
+            "Crown spotted",
+            "David spotted",
+            "Hot mic!",
+            "Max's game crashed",
+            "Target aquired",
+            "Stream sniper spotted"
         ],
         "Misc": [
             "$100+ donation",
             "1000 concurrent stream viewers",
             "5+ hour stream",
-            "Banned from server",
-            "ERP spotted",
-            "Furry in stream",
+            "Hard F in stream",
             "Hard RE in stream",
-            "Player is a minor",
+            "Jett appears on stream",
             "PC check",
-            "Player crashes out",
-            "Player locked out of their car",
+            "Player is a minor",
             "Server nuked",
             "Smoke detector BEEP",
-            "Stream sniped",
+            "Someone banned in YT chat",
             "Stream technical problems"
         ]
+    },
+    "limits": {
+        "Characters": 3
     }
 }

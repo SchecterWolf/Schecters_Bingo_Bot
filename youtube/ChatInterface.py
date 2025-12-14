@@ -73,8 +73,8 @@ class ChatInterface:
                         pageToken=self.pageToken,
                     )
             response = request.execute()
-        except Exception:
-            ChatInterface.__LOGGER.log(LogLevel.LEVEL_ERROR, "Failed to send get message request.")
+        except Exception as e:
+            ChatInterface.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Failed to send get message request: {e}")
 
         ret: List[ChatMessage] = []
         if response:
@@ -85,8 +85,8 @@ class ChatInterface:
                     mod = message.get("authorDetails", {}).get("isChatModerator", False)
                     author = message.get("authorDetails", {}).get("displayName", "unknown")
                     ret.append(ChatMessage(msg, mod, author))
-            except Exception:
-                ChatInterface.__LOGGER.log(LogLevel.LEVEL_ERROR, "Failed to access chat messages from response.")
+            except Exception as e:
+                ChatInterface.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Failed to access chat messages from response: {e}")
 
         return ret
 
@@ -106,7 +106,7 @@ class ChatInterface:
                                 "liveChatId": self.chatID,
                                 "type": "textMessageEvent",
                                 "textMessageDetails": {
-                                    "messageText": f"[BINGO] {message}"
+                                    "messageText": f"[BINGO]**testing** {message}"
                                 }
                             }
                         }
@@ -120,8 +120,8 @@ class ChatInterface:
                 if msgID:
                     self.messageIDs.append(msgID)
 
-        except Exception:
-            ChatInterface.__LOGGER.log(LogLevel.LEVEL_ERROR, "Send message request failed.")
+        except Exception as e:
+            ChatInterface.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Send message request failed: {e}")
 
         if self.chatID:
             self._delOldMessages(self.chatID)
@@ -171,16 +171,17 @@ class ChatInterface:
                         id=videoID
                     )
             response = request.execute()
-        except Exception:
-            ChatInterface.__LOGGER.log(LogLevel.LEVEL_ERROR, "Failed to look up channel videos.")
+        except Exception as e:
+            ChatInterface.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Failed to look up channel videos: {e}")
             self.chatID = None
             return False
 
         # Get livestream chat ID
         try:
             self.chatID = response["items"][0]["liveStreamingDetails"]["activeLiveChatId"]
-        except Exception:
-            ChatInterface.__LOGGER.log(LogLevel.LEVEL_ERROR, "Failed to get livestream chat ID.")
+            ChatInterface.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Chat ID retrieved for livestream: {self.chatID}")
+        except Exception as e:
+            ChatInterface.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Failed to get livestream chat ID: {e}")
             self.chatID = None
             return False
 

@@ -6,23 +6,23 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
-import json
-import os
+import sqlite3
 import time
 
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Globals import GLOBALVARS
-from pathlib import Path
-from typing import Dict, List
+from typing import List, Optional
 
-TypeBannedData = Dict[str, str]
-TypeBannedPlayer = Dict[str, TypeBannedData]
+class BannedPlayer():
+    def __init__(self):
+        self.dbID: Optional[int] = None
+        self.userID = 0
+        self.name = ""
+        self.timestamp = time.time()
 
 class BannedData:
     __instance = None
     __LOGGER = ClassLogger(__name__)
-    __FIELD_BANNED_DATA_NAME = "name"
-    __FIELD_BANNED_DATA_TIMESTAMP = "timestamp"
 
     def __new__(cls, *args, **kwargs):
         if not cls.__instance:
@@ -34,52 +34,79 @@ class BannedData:
         if hasattr(self, "initialized"):
             return
 
-        self.bannedFile = Path(GLOBALVARS.FILE_BANNED_DATA)
-        self.data: TypeBannedPlayer = {}
+        self.data: List[BannedPlayer] = []
 
         self._loadData()
         self.initialized = True
 
-    def __del__(self):
-        self.flush()
-
-    def flush(self):
-        if not self.data:
-            return
-
-        with self.bannedFile.open("w") as file:
-            json.dump(self.data, file, indent=4)
-            BannedData.__LOGGER.log(LogLevel.LEVEL_INFO, "Banned data has been saved.")
-
     def isBanned(self, playerID: int) -> bool:
-        return str(playerID) in self.data
+        return any(p.userID == playerID for p in self.data )
 
     def addBanned(self, playerID: int, playerName: str):
-        BannedData.__LOGGER.log(LogLevel.LEVEL_INFO, f"Player ID {playerID} has been added to the banned list.")
-        self.data[str(playerID)] = {
-            BannedData.__FIELD_BANNED_DATA_NAME: playerName,
-            BannedData.__FIELD_BANNED_DATA_TIMESTAMP: str(time.time())
-        }
-        self.flush()
-
-    def removeBanned(self, playerID: int):
-        if str(playerID) in self.data:
-            BannedData.__LOGGER.log(LogLevel.LEVEL_INFO, f"Player ID {playerID} has been removed from the banned list.")
-            del self.data[str(playerID)]
-            self.flush()
-
-    def getAllBanned(self) -> List[int]:
-        return [int(playerID) for playerID in self.data.keys()]
-
-    def _loadData(self):
-        if not self.bannedFile.exists() or not os.path.getsize(self.bannedFile):
-            BannedData.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Banned file is empty or non existent, skipping load.")
+        # Check if player is already banned
+        if self.isBanned(playerID):
+            BannedData.__LOGGER.log(LogLevel.LEVEL_INFO, f"Player ID {playerID} has been banned, skipping.")
             return
 
+        bp = BannedPlayer()
+        bp.userID = playerID
+        bp.name = playerName
+        bp.timestamp = time.time()
+
+        self.data.append(bp)
+        self._addToDB(bp)
+        BannedData.__LOGGER.log(LogLevel.LEVEL_INFO, f"Player ID {playerID} has been added to the banned list.")
+
+    def removeBanned(self, playerID: int):
+        for bp in self.data:
+            if bp.userID == playerID:
+                BannedData.__LOGGER.log(LogLevel.LEVEL_INFO, f"Player ID {playerID} has been removed from the banned list.")
+                self._rmFromDB(bp)
+                self.data.remove(bp)
+                break
+
+    def getAllBanned(self) -> List[int]:
+        return [int(bp.userID) for bp in self.data]
+
+    def _addToDB(self, bp: BannedPlayer):
+        conn = sqlite3.connect(GLOBALVARS.FILE_GAME_DB)
+        cur = conn.cursor()
+
+        cur.execute("INSERT INTO BANNED (userid, name, timestamp)"
+                    + " VALUES (?,?,?)",
+                    [
+                        bp.userID,
+                        bp.name,
+                        bp.timestamp
+                    ])
+        bp.dbID = cur.lastrowid
+
+        conn.commit()
+        conn.close()
+
+    def _rmFromDB(self, bp: BannedPlayer):
+        conn = sqlite3.connect(GLOBALVARS.FILE_GAME_DB)
+        cur = conn.cursor()
+        cur.execute("DELETE FROM BANNED WHERE id = ?", (bp.dbID,))
+        conn.commit()
+        conn.close()
+
+    def _loadData(self):
         BannedData.__LOGGER.log(LogLevel.LEVEL_INFO, "Reading in banned player data.")
-        with self.bannedFile.open("r") as file:
-            try:
-                self.data = json.load(file)
-            except Exception as e:
-                BannedData.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Could not load banned player data file: {e}")
+        conn = sqlite3.connect(GLOBALVARS.FILE_GAME_DB)
+        cur = conn.cursor()
+
+        cur.execute("SELECT id, userid, name, timestamp"
+                    + f" FROM BANNED")
+        rows = cur.fetchall()
+
+        for row in rows:
+            bp = BannedPlayer()
+            bp.dbID = row[0]
+            bp.userID = row[1]
+            bp.name = row[2]
+            bp.timestamp = row[3]
+            self.data.append(bp)
+
+        conn.close()
 

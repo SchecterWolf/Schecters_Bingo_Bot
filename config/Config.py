@@ -24,6 +24,9 @@ class Config:
             cls.__instance = super().__new__(cls, *args, **kwargs)
         return cls.__instance
 
+    def resetConfig(self):
+        self.__config = {}
+
     def getConfig(self, configStr: str, default: Any = "") -> Any:
         if not self.__config:
             self._loadConfig()

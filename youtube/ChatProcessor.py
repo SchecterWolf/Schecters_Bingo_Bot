@@ -32,7 +32,7 @@ class ChatProcessor:
 
     __POLLING_INTERVAL_SEC = 15
     __COMMAND_INTERVAL_SEC = 60
-    __REQ_INTERVAL_SEC = 15
+    __REQ_INTERVAL_SEC = 60
     __NEW_PLAYER_INTERVAL_SEC = 30
 
     __COMMAND_CMD = "cmd"
@@ -159,7 +159,7 @@ class ChatProcessor:
         val: str = ""
         with self.lockNewPlayerJoined:
             if self.playersAdded and len(self.playersAdded) < ChatProcessor.__MAX_NAMED_PLAYERS:
-                val = "Players " + ", ".join(self.playersAdded) + "has joined the livestream bingo!"
+                val = "Players " + ", ".join(self.playersAdded) + " has joined the livestream bingo!"
             elif self.playersAdded:
                 val = "Players " + ", ".join(self.playersAdded[:ChatProcessor.__MAX_NAMED_PLAYERS]) + \
                         f" and {len(self.playersAdded) - ChatProcessor.__MAX_NAMED_PLAYERS} others " + \
@@ -172,6 +172,8 @@ class ChatProcessor:
             self.broadcastNewPlayersTimestamp = time.time()
 
     def _processMessage(self, message: ChatMessage):
+        # TODO There seems to be a segfault here after running for awhile
+        return
         command = self.commands.get(message.getCommand())
         if command and time.time() - command[ChatProcessor.__COMMAND_STAMP] >= ChatProcessor.__COMMAND_INTERVAL_SEC:
             if command[ChatProcessor.__COMMAND_MOD] and not message.isMod():

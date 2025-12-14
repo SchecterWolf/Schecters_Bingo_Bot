@@ -15,7 +15,7 @@ from .Bing import Bing
 from .Binglets import Binglets
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 class Card:
     ROW = 'row'
@@ -46,11 +46,12 @@ class Card:
         self._initBoard()
         idString = ""
         bings = Binglets(gameType).getBingletsCopy()
+        limits = Binglets(gameType).getLimits()
 
         for i in range(Card._cardSize):
             row = []
             for j in range(Card._cardSize):
-                bing = self._extractRandomBinglet(bings)
+                bing = self._extractRandomBinglet(limits, bings)
                 bing.x = i
                 bing.y = j
                 idString += bing.bingStr
@@ -191,10 +192,24 @@ class Card:
             Card.DIAG: {},
         }
 
-    def _extractRandomBinglet(self, bings) -> Bing:
+    def _extractRandomBinglet(self, limits: Dict[str, int], bings) -> Bing:
+        if not bings:
+            return Bing("invalid", -1)
+
         if not hasattr(random, "_initSeed"):
             random.seed(time.time())
             setattr(random, "_initSeed", True)
         randomIdx = random.randrange(0, len(bings))
-        return bings.pop(randomIdx)
+        ret: Bing = bings.pop(randomIdx)
+
+        # Check if we have a category limit, retry (recursive) if the limit is reached,
+        # else decrement the limit and proceed
+        catLimit = limits.get(ret.category, None)
+        if catLimit != None:
+            if catLimit == 0:
+                ret = self._extractRandomBinglet(limits, bings)
+            else:
+                limits[ret.category] = catLimit - 1
+
+        return ret
 

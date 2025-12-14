@@ -8,6 +8,7 @@ __email__ = "--"
 
 import discord
 
+from .Decorators import require_gamemaster
 from .IGameCtrlBtn import IGameCtrlBtn
 from .IGateKeeper import IGateKeeper
 
@@ -36,6 +37,7 @@ class PauseGameButton(IGameCtrlBtn, IGateKeeper):
         view.interaction_check = self.interactionCheck
         self._interactExpired = False
 
+    @require_gamemaster
     async def button_callback(self, interaction: discord.Interaction):
         PauseGameButton.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Discord pause bingo game button pressed.")
         # Note: The button never becomes un-expired, since the button view is expected to be removed

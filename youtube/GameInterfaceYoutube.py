@@ -42,12 +42,10 @@ class GameInterfaceYoutube(IGameInterface):
     def start(self) -> Result:
         GameInterfaceYoutube.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Sending start message to yt livestream.")
         message = Config().getFormatConfig("StreamerName", GLOBALVARS.GAME_MSG_STARTED)
-        message += f" {GLOBALVARS.GAME_MSG_JOIN}"
-        #ret = self.chatIface.sendMessage(message) and\
-        #        self.chatIface.sendMessage(GLOBALVARS.GAME_NIGHTBOT_CMD_DISCORD)
-        ret = self.chatIface.sendMessage(message)
+        self.chatIface.sendMessage(message)
+        self.chatIface.sendMessage(f"{GLOBALVARS.GAME_MSG_JOIN}")
 
-        return Result(ret)
+        return Result(True)
 
     def stop(self) -> Result:
         GameInterfaceYoutube.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Sending stop message to yt livestream.")
@@ -99,8 +97,9 @@ class GameInterfaceYoutube(IGameInterface):
 
         # Print message to stream chat
         ret.result = self.chatIface.sendMessage(f"Slot called: {bing.bingStr}")
-        if newPlayerBingos:
-            ret.result = ret.result and self.chatIface.sendMessage(newPlayerCalls)
+        # TODO Not doing this quite yet
+        #if newPlayerCalls:
+        #    ret.result = ret.result and self.chatIface.sendMessage(newPlayerCalls)
         if newPlayerBingos:
             ret.result = ret.result and self.chatIface.sendMessage(newPlayerBingos)
 
