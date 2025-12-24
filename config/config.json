@@ -1,4 +1,5 @@
 {
+    "SkipServer": [858832309331034132],
     "BonusBingo": 20,
     "BonusGamesPlayed": 5,
     "BonusSlotsCalled": 2,
@@ -20,6 +21,7 @@
     "StreamerName": "Max",
     "TokenFile": "config/token.txt",
     "UseFreeSpace": true,
+    "UseRecovery": true,
     "YTEnabled": false,
     "YTChannelID": "UC-0WjH-efG2qvNlZUBlX70Q",
     "YTCredFile": "config/client_secret.json",

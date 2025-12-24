@@ -20,7 +20,6 @@ from .StartGameButton import StartGameButton
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from config.Globals import GLOBALVARS
-from config.Version import BOT_VERSION
 
 from discord.client import Client
 from discord.ui import View
@@ -109,6 +108,10 @@ class Bot(Client):
         Called whenever this bot is added to a discord server or when the bot is
         starting up
         """
+        if guild.id in Config().getConfig("SkipServer", []):
+            Bot.__LOGGER.log(LogLevel.LEVEL_CRIT, f"Guild \"{guild.name}\" marked as skiped.... skipping!")
+            return
+
         Bot.__LOGGER.log(LogLevel.LEVEL_INFO, f"Initializing guild: {guild.name}")
         persistentStats = PersistentStats(guild.id)
 
