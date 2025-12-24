@@ -6,6 +6,8 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
+import discord
+
 from .GameControls import GameControls, GameControlState
 from .GameGuild import GameGuild
 from .IChannelInterface import IChannelInterface, ChannelView, verifyView
@@ -23,13 +25,24 @@ class AdminChannel(IChannelInterface):
     __MSG_GAME_CONTROLS = "gamecontrols"
     __MSG_MAKE_CALL = "makecall"
 
-    def __init__(self, gameGuild: GameGuild, gameType: str):
+    def __init__(self, gameGuild: GameGuild, gameType: str, gameMasterRole: Optional[discord.Role]):
         super().__init__(gameGuild.channelAdmin)
 
         self.gameID = gameGuild.guildID
         self.callView = MakeCallView(gameGuild.guildID, gameType)
         self.gameControls = GameControls(gameGuild.guildID)
         self.requestsViews: List[RequestView] = []
+        self.gameMasterRole: Optional[discord.Role] = gameMasterRole
+
+    async def setViewIdle(self):
+        botInfo = self.getFormattedBotInfo(Config().getBotVersion())
+        self.gameControls.setControllsState(GameControlState.ENDED)
+
+        # Add Github link
+        botInfo += f"\n{GLOBALVARS.GAME_MSG_GITHUB}"
+
+        await self._purgeChannel()
+        await self._channel.send(botInfo, view=self.gameControls)
 
     @verifyView(ChannelView.NEW)
     async def setViewNew(self):
@@ -56,9 +69,7 @@ class AdminChannel(IChannelInterface):
 
     @verifyView(ChannelView.STOPPED)
     async def setViewStopped(self):
-        await self._purgeChannel()
-        self.gameControls.setControllsState(GameControlState.ENDED)
-        await self._updateChannelItem(AdminChannel.__MSG_GAME_CONTROLS, content=self.gameControls.msgStr, view=self.gameControls)
+        await self.setViewIdle()
         await self.sendNotice(Config().getFormatConfig("StreamerName", GLOBALVARS.GAME_MSG_ENDED))
 
     async def addCallRequest(self, request: CallRequest):
@@ -73,7 +84,7 @@ class AdminChannel(IChannelInterface):
         if requestView:
             requestView.updateRequest(request)
         else:
-            requestView = RequestView(self.gameID, request)
+            requestView = RequestView(self.gameID, request, self.gameMasterRole)
             self.requestsViews.append(requestView)
 
         # Update the view in discord
@@ -98,6 +109,10 @@ class AdminChannel(IChannelInterface):
             await self._deleteChannelItem(req.viewID)
 
     async def _addAllCallViews(self):
+        if Config().getConfig('CasualMode', False):
+            await self._updateChannelItem(AdminChannel.__MSG_MAKE_CALL, content="(Game is in Casual Mode)")
+            return
+
         cv: Optional[MakeCallView] = self.callView
         while cv:
             await self._updateChannelItem(AdminChannel.__MSG_MAKE_CALL + str(id(cv)), content=cv.msgStr, view=cv)

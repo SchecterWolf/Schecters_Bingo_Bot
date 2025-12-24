@@ -16,3 +16,7 @@ class IGameController(ABC):
     @abstractmethod
     def stopGame(self, *args, **kwargs):
         pass
+
+    @abstractmethod
+    async def startGameFromRecovery(self, gameID: int) -> bool:
+        pass

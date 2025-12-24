@@ -6,6 +6,7 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
+import game.Game as GameModule
 import discordSrc.GameInterfaceDiscord as GameInterfaceDiscordModule
 
 from . import Classes as Classes
@@ -17,6 +18,12 @@ from game.ActionData import ActionData
 from game.Game import GameState
 
 from typing import Any
+from unittest.mock import MagicMock
+
+def disableBannedData(monkeypatch):
+    mockBannedData = MagicMock()
+    mockBannedData.isBanned.return_value = False
+    monkeypatch.setattr(GameModule, "BannedData", lambda: mockBannedData)
 
 def disableBanSaving(iface: GameInterfaceDiscord):
     def noOP(*args, **kwargs):

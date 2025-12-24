@@ -17,6 +17,7 @@ from config.Globals import GLOBALVARS
 
 from game.GameStore import GameStore
 from game.IGameController import IGameController
+from game.Recovery import Recovery
 from game.Result import Result
 from game.Sync import sync_aware
 
@@ -40,6 +41,31 @@ class GameControllerDiscord(IGameController):
 
     def stopGame(self, *args, **kwargs):
         self._stopGameInternal(*args, **kwargs)
+
+    async def startGameFromRecovery(self, gameID: int) -> bool:
+        ret = Result(False)
+        store = GameStore()
+        gameGuild = self.gameGuilds.get(gameID)
+        newGame = store.getGame(gameID)
+
+        # Create the new bingo game discord iface object
+        if not gameGuild:
+            ret.responseMsg = f"Discord server id \"{gameID}\" has not been registered with the bot, aborting."
+        elif newGame:
+            ret.responseMsg = f"Discord server id \"{gameID}\" already has a game in progress, skipping."
+            newGame = None
+        else:
+            newGame = GameInterfaceDiscord(self.bot, gameGuild, GLOBALVARS.GAME_TYPE_DEFAULT)
+            store.addGame(gameID, newGame)
+            ret = await newGame.syncronizeWithRecoveredGame()
+
+        # Remove the game if there was an error setting up the game
+        if ret.result:
+            GameControllerDiscord.__LOGGER.log(LogLevel.LEVEL_INFO, f"Game successfully recovered! Adding the game to the internal game store.")
+        else:
+            store.removeGame(gameID)
+
+        return ret.result
 
     @sync_aware
     async def _startGameInternal(self, interaction: discord.Interaction) -> Result:
@@ -101,6 +127,7 @@ class GameControllerDiscord(IGameController):
         elif isinstance(game, IAsyncDiscordGame):
             await game.destroy()
             store.removeGame(guildID)
+            Recovery(guildID).removeRecovery()
             ret.result = True
             ret.responseMsg = f"Bingo game stopped."
 

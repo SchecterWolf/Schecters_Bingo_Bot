@@ -15,6 +15,7 @@ from .IAsyncDiscordGame import IAsyncDiscordGame
 from discord import Embed
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import GLOBALVARS
+from config.Config import Config
 from game.GameStore import GameStore
 from game.IGameInterface import IGameInterface
 from game.PersistentStats import PlayerOrdinal, PersistentStats, GetBonus
@@ -42,6 +43,7 @@ class GameStatusEmbed(Embed):
         self.iconName = os.path.basename(GLOBALVARS.IMAGE_BINGO_ICON)
         self.file = discord.File(GLOBALVARS.IMAGE_BINGO_ICON, filename=self.iconName)
         self.gameID = gameID
+        self.casualMode = Config().getConfig('CasualMode', False)
 
         # Embed members
         gameIface = GameStore().getGame(self.gameID)
@@ -102,13 +104,14 @@ class GameStatusEmbed(Embed):
         for index, player in enumerate(topPlayers):
             bingos = player.stats[PersistentStats.ITEM_TOTAL][PersistentStats.DATA_ITEM_BINGOS]
             slots = player.stats[PersistentStats.ITEM_TOTAL][PersistentStats.DATA_ITEM_CALLS]
-            val=f"\
-__**{player.name}**__\n\
-Bingos {bingos}\n\
-{GameStatusEmbed.__INLINE_SPACER_BIGGER}[{bingos * bingoBonus} Pts]\n\
-Slots Marked {slots}{GameStatusEmbed.__INLINE_SPACER}\n\
-{GameStatusEmbed.__INLINE_SPACER_BIGGER}[{slots * callBonus} Pts]\n\
-**{player.points[PersistentStats.ITEM_TOTAL]} Pts Total**"
+            val=f"__**{player.name}**__\n"
+            if bingos:
+                val += f"Bingos {bingos}\n\
+{GameStatusEmbed.__INLINE_SPACER_BIGGER}[{bingos * bingoBonus} Pts]\n"
+            if slots:
+                val += f"Slots Marked {slots}{GameStatusEmbed.__INLINE_SPACER}\n\
+{GameStatusEmbed.__INLINE_SPACER_BIGGER}[{slots * callBonus} Pts]\n"
+            val += f"**{player.points[PersistentStats.ITEM_TOTAL]} Pts Total**"
             self.add_field(name=f"{GameStatusEmbed.__ORDINAL_EMOJI[index]} {GameStatusEmbed.__ORDINALS[index]} Player",
                            value=val, inline=True)
 
@@ -135,6 +138,9 @@ Slots Marked {slots}{GameStatusEmbed.__INLINE_SPACER}\n\
         self._addFieldSeparator()
 
     def _refreshCalls(self, game: IGameInterface):
+        if self.casualMode:
+            return
+
         calledStrs: List[List[str]] = [[]]
         for slot in game.game.getCalls():
             calledRow = calledStrs[-1]

@@ -77,10 +77,13 @@ class Binglets:
 
     def getBingFromIndex(self, index: int) -> Bing:
         ret = Bing("", -1)
-        for bing in self.getBingletsCopy():
-            if index == bing.bingIdx:
-                ret = copy.copy(bing)
-                break
+        if index == 0:
+            ret = Bing("FREE SPACE", 0)
+        else:
+            for bing in self.getBingletsCopy():
+                if index == bing.bingIdx:
+                    ret = copy.copy(bing)
+                    break
         return ret
 
     def findBings(self, substr: str) -> List[Bing]:

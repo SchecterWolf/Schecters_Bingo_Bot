@@ -62,6 +62,10 @@ class IGameInterface(ABC):
         pass
 
     @abstractmethod
+    def requestCallCasual(self, data: ActionData) -> Result:
+        pass
+
+    @abstractmethod
     def deleteRequest(self, data: ActionData) -> Result:
         pass
 

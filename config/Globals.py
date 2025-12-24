@@ -8,8 +8,6 @@ __email__ = "--"
 
 from pathlib import Path
 
-from .Version import BOT_VERSION
-
 class GLOBALVARS:
     PROJ_ROOT = str(Path(__file__).parent.parent)
 
@@ -20,6 +18,7 @@ class GLOBALVARS:
     FILE_CONFIG_GENERAL = DIR_CONFIG + "/config.json"
     FILE_CONFIG_BINGLETS = DIR_CONFIG + "/binglets.json"
     FILE_GAME_DB = DIR_DATA + "/data.sqlite"
+    FILE_BOT_VERSION = DIR_DATA + "/version.txt"
 
     IMAGE_BINGO_ICON = DIR_RESOURCES + "/assets/BingoIcon.png"
     IMAGE_CALL_ICON = DIR_RESOURCES + "/assets/CallIcon.png"
@@ -32,15 +31,14 @@ class GLOBALVARS:
     IMAGE_RANK_3RD_BOARD = DIR_RESOURCES + "/assets/RankUI3rd.png"
     IMAGE_RANK_BOARD = DIR_RESOURCES + "/assets/RankUI.png"
 
-    CHANNEL_BINGO = "bingo" # TODO SCH change these to use the config instead
-    CHANNEL_ADMIN_BINGO ="bingo-admin"
-
-    GAME_MSG_STARTUP = f"Schecter's Bingo Bot ready.\n{BOT_VERSION}"
+    GAME_MSG_STARTUP = "Schecter's Bingo Bot ready.\n{BOT_VERSION}"
+    GAME_MSG_GITHUB = "https://github.com/SchecterWolf/Schecters_Bingo_Bot"
     GAME_MSG_ENDED = "{StreamerName} livestream bingo has ended."
     GAME_MSG_PAUSED = "{StreamerName} livestream bingo game is paused."
     GAME_MSG_RESUMED = "{StreamerName} livestream bingo game has been resumed."
     GAME_MSG_STARTED = "{StreamerName} livestream bingo game has been started!"
     GAME_MSG_JOIN = "To play the livestream bingo, visit our discord and click the \"Play Bingo\" in the bingo channel!" # TODO SCH use the config var for the bingo channel
+    GAME_MSG_DISCORD_JOIN = "To play the livestream bingo, head over to the channel"
     GAME_MSG_ADDED = "Player \"{player}\" has joined the livestream bingo!"
     GAME_MSG_KICKED = "Player \"{player}\" has been KICKED from the livestream bingo."
     GAME_MSG_BANNED = "Player \"{player}\" has been BANNED from the livestream bingo."

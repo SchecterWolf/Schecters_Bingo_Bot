@@ -48,13 +48,24 @@ def MakePlayersBingoNotif(players: List[Player]) -> str:
     return bingosStr
 
 def MakeCallRequestNotif(request: CallRequest, includeID = False) -> str:
+    return MakeCallRequestNotifWRole(request, "", includeID)
+
+def MakeCallRequestNotifWRole(request: CallRequest, mention: str, includeID = False) -> str:
+    reqStr: str = "Slot "
+
     if includeID:
-        reqStr = f"Slot \"[{request.requestBing.bingIdx}] {request.requestBing.bingStr}\" is requested by {request.getPrimaryRequester().card.getCardOwner()}"
+        reqStr += f"\"[{request.requestBing.bingIdx}] {request.requestBing.bingStr}\" is requested by {request.getPrimaryRequester().card.getCardOwner()}"
     else:
-        reqStr = f"Slot \"{request.requestBing.bingStr}\" is requested by {request.getPrimaryRequester().card.getCardOwner()}"
+        reqStr += f"\"{request.requestBing.bingStr}\" is requested by {request.getPrimaryRequester().card.getCardOwner()}"
+
     if len(request.players) < 2:
         reqStr += "."
     else:
         reqStr += f" and {len(request.players) - 1} other" + ("s." if len(request.players) > 2 else ".")
+
+    # Add mention if configured
+    if mention:
+        reqStr += f" {mention} "
+
     return reqStr
 

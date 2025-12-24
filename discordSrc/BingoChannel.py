@@ -34,6 +34,11 @@ class BingoChannel(IChannelInterface):
         self.addPlayer = AddPlayerButton(guild.guildID)
         self.showAddBtn = False
 
+    async def setViewIdle(self):
+        botInfo = self.getFormattedBotInfo(Config().getBotVersion())
+        await self._purgeChannel()
+        await self._channel.send(botInfo, file=await self._getLeaderBoardFile(True))
+
     @verifyView(ChannelView.NEW)
     async def setViewNew(self):
         pass
@@ -57,8 +62,7 @@ class BingoChannel(IChannelInterface):
     @verifyView(ChannelView.STOPPED)
     async def setViewStopped(self):
         self.showAddBtn = False
-        await self._purgeChannel()
-        await self._updateChannelItem(BingoChannel.__MSG_GLOBAL_STATS, content=GLOBALVARS.GAME_MSG_STARTUP, file=await self._getLeaderBoardFile(True))
+        await self.setViewIdle()
 
         self.gameStatus.conclude()
         await self._updateChannelItem(BingoChannel.__MSG_GAME_STATUS, embed=self.gameStatus)

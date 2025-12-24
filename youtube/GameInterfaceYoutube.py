@@ -110,6 +110,9 @@ class GameInterfaceYoutube(IGameInterface):
         self.chatProcessor.addCallRequest(callRequest)
         return Result(True)
 
+    def requestCallCasual(self, data: ActionData) -> Result:
+        return Result(True)
+
     def deleteRequest(self, _: ActionData) -> Result:
         """No stream message for delete requests"""
         return Result(False)

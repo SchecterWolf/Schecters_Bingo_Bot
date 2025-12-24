@@ -41,6 +41,15 @@ class Config:
 
         return ret
 
+    def getBotVersion(self) -> str:
+        ret = "0000000"
+        try:
+            with open(GLOBALVARS.FILE_BOT_VERSION, "r") as f:
+                ret = f.readline().strip()
+        except:
+            print("Could not read version file.")
+        return ret
+
     def _loadConfig(self):
         if not Config.__file.exists() or not os.path.getsize(Config.__file):
             return

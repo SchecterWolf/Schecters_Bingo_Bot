@@ -9,13 +9,17 @@ __email__ = "--"
 from discord.channel import TextChannel
 from game.PersistentStats import PersistentStats
 
+from typing import Optional
+
 class GameGuild:
     def __init__(self, guildID: int,
                  persistentStats: PersistentStats,
                  channelBingo: TextChannel,
-                 channelAdmin: TextChannel):
+                 channelAdmin: TextChannel,
+                 channelGeneral: Optional[TextChannel] = None):
         self.guildID = guildID
         self.persistentStats = persistentStats
         self.channelBingo = channelBingo
         self.channelAdmin = channelAdmin
+        self.channelGeneral = channelGeneral
 

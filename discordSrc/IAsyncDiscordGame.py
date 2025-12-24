@@ -64,6 +64,10 @@ class IAsyncDiscordGame(IGameInterface):
         pass
 
     @abstractmethod
+    async def requestCallCasual(self, data: ActionData) -> Result:
+        pass
+
+    @abstractmethod
     async def deleteRequest(self, data: ActionData) -> Result:
         pass
 

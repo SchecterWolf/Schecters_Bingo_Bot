@@ -12,6 +12,8 @@ from enum import Enum
 from functools import wraps
 from typing import Union
 
+from config.Globals import GLOBALVARS
+
 class ChannelView(Enum):
     INIT = 0
     NEW = 1
@@ -45,6 +47,10 @@ class IChannelInterface(ABC):
         self._channel = channel
         self._messageIDs: dict[str, int] = {}
         self._currentView: ChannelView = ChannelView.INIT
+
+    def getFormattedBotInfo(self, strHash: str) -> str:
+        data = {'BOT_VERSION': strHash}
+        return GLOBALVARS.GAME_MSG_STARTUP.format(**data)
 
     async def sendNotice(self, notice: str):
         await self.sendNoticeItem(content=f"NOTICE: {notice}")
@@ -83,6 +89,10 @@ class IChannelInterface(ABC):
             del self._messageIDs[idString]
             message = await self._channel.fetch_message(messageID)
             await message.delete()
+
+    @abstractmethod
+    async def setViewIdle(self):
+        pass
 
     @abstractmethod
     async def setViewNew(self):

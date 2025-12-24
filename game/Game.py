@@ -12,6 +12,7 @@ from .BannedData import BannedData
 from .Bing import Bing
 from .Binglets import Binglets
 from .CallRequest import CallRequest
+from .IRecoveryInterface import IRecoveryInterface
 from .PersistentStats import PersistentStats
 from .Player import Player
 from .Result import Result
@@ -49,12 +50,16 @@ class Game:
         self.state: GameState = GameState.NEW
         self.timeStarted = time.time()
         self.gameType = gameType
+        self.recovery: Optional[IRecoveryInterface] = None
 
         self.calledBings: Set[Bing] = set()
         self.kickedPlayers: Set[int] = set()
         self.playerBingos: Set[str] = set()
         self.players: Set[Player] = set()
         self.requestedCalls: List[CallRequest] = []
+
+    def setRecovery(self, recovery: IRecoveryInterface):
+        self.recovery = recovery
 
     def initGame(self, stats: PersistentStats) -> bool:
         if self.state != GameState.NEW:
@@ -64,11 +69,19 @@ class Game:
             self.persistentStats = stats
             Game._LOGGER.log(LogLevel.LEVEL_INFO, "Game initialized successfully.")
 
-        return self.state != GameState.NEW
+        ret: bool = self.state != GameState.NEW
+
+        if ret and self.recovery:
+            self.recovery.updateRecovery(self)
+
+        return ret
 
     def destroyGame(self):
         self.stopGame()
         self.state = GameState.DESTROYED
+
+        if self.recovery:
+            self.recovery.removeRecovery()
 
     def startGame(self) -> Result:
         Game._LOGGER.log(LogLevel.LEVEL_DEBUG, "Game is starting...")
@@ -90,6 +103,8 @@ class Game:
 
         if ret.result:
             Game._LOGGER.log(LogLevel.LEVEL_INFO, ret.responseMsg)
+            if self.recovery:
+                self.recovery.updateRecovery(self)
 
         return ret
 
@@ -112,6 +127,9 @@ class Game:
         ret.responseMsg = "Bingo game stopped."
         Game._LOGGER.log(LogLevel.LEVEL_INFO, ret.responseMsg)
 
+        if ret.result and self.recovery:
+            self.recovery.updateRecovery(self)
+
         return ret
 
     def pauseGame(self) -> Result:
@@ -123,6 +141,9 @@ class Game:
             self.state = GameState.PAUSED
             ret.result = True
 
+        if ret.result and self.recovery:
+            self.recovery.updateRecovery(self)
+
         return ret
 
     def resumeGame(self) -> Result:
@@ -133,6 +154,9 @@ class Game:
         else:
             self.state = GameState.STARTED
             ret.result = True
+
+        if ret.result and self.recovery:
+            self.recovery.updateRecovery(self)
 
         return ret
 
@@ -196,6 +220,9 @@ class Game:
             ret.responseMsg += f"\n{warn}"
             Game._LOGGER.log(LogLevel.LEVEL_WARN, warn)
 
+        if ret.result and self.recovery:
+            self.recovery.updateRecovery(self)
+
         return ret
 
     def kickPlayer(self, playerID: int) -> Result:
@@ -232,6 +259,10 @@ class Game:
 
         ret.result = True
         ret.additional = kickPlayer
+
+        if ret.result and self.recovery:
+            self.recovery.updateRecovery(self)
+
         return ret
 
     def banPlayer(self, playerID: int, playerName: str) -> Result:
@@ -243,6 +274,9 @@ class Game:
         # Remove player from the saved player data
         if self.persistentStats:
             self.persistentStats.removePlayer(playerID)
+
+        if ret.result and self.recovery:
+            self.recovery.updateRecovery(self)
 
         return ret
 
@@ -281,11 +315,65 @@ class Game:
         ret.additional = (markedPlayers, newBingos)
         Game._LOGGER.log(LogLevel.LEVEL_DEBUG, ret.responseMsg)
 
+        if ret.result and self.recovery:
+            self.recovery.updateRecovery(self)
+
+        return ret
+
+    def requestCallCasual(self, callRequest: CallRequest) -> Result:
+        ret: Result = self._validateRequestCall(callRequest)
+
+        if not ret.result:
+            return ret
+
+        # Mark the slot for the player
+        player: Player = self.getPlayer(callRequest.getRequesterID()).additional
+        if player:
+            player.card.markCell(callRequest.requestBing)
+            ret.responseMsg = f"Player \"{player.card.getCardOwner()}\"({player.userID}) marked their slot \"{callRequest.requestBing.bingStr}\"({callRequest.requestBing.bingIdx})"
+            ret.additional = player
+            Game._LOGGER.log(LogLevel.LEVEL_DEBUG, ret.responseMsg)
+
+        if ret.result and self.recovery:
+            self.recovery.updateRecovery(self)
+
         return ret
 
     def requestCall(self, callRequest: CallRequest) -> Result:
-        ret = Result(False)
+        ret: Result = self._validateRequestCall(callRequest)
+
+        if not ret.result:
+            return ret
+
+        # Try and find an existing matching request, if any
         existingRequest = None
+        for request in self.requestedCalls:
+            if callRequest.isMatchingRequest(request):
+                existingRequest = request
+                break
+
+        # Merge requests if a matching one already exists
+        if existingRequest:
+            existingRequest.mergeRequests(callRequest)
+        # Add in a new call request
+        else:
+            self.requestedCalls.append(callRequest)
+            existingRequest = callRequest
+
+        ret.result = True
+        ret.responseMsg = f"Request for {callRequest.requestBing.bingStr} has been made."
+        if len(existingRequest.players) > 1:
+            ret.responseMsg += f" There are {len(existingRequest.players)} players with this same request."
+        ret.additional = existingRequest
+
+        if ret.result and self.recovery:
+            self.recovery.updateRecovery(self)
+
+        Game._LOGGER.log(LogLevel.LEVEL_INFO, ret.responseMsg)
+        return ret
+
+    def _validateRequestCall(self, callRequest: CallRequest) -> Result:
+        ret = Result(False)
 
         # Check pre-conditions
         if self.state != GameState.STARTED:
@@ -313,27 +401,7 @@ for a slot that they do not have on their board."
             Game._LOGGER.log(LogLevel.LEVEL_ERROR, ret.responseMsg)
             return ret
 
-        # Try and find an existing matching request, if any
-        for request in self.requestedCalls:
-            if callRequest.isMatchingRequest(request):
-                existingRequest = request
-                break
-
-        # Merge requests if a matching one already exists
-        if existingRequest:
-            existingRequest.mergeRequests(callRequest)
-        # Add in a new call request
-        else:
-            self.requestedCalls.append(callRequest)
-            existingRequest = callRequest
-
         ret.result = True
-        ret.responseMsg = f"Request for {callRequest.requestBing.bingStr} has been made."
-        if len(existingRequest.players) > 1:
-            ret.responseMsg += f" There are {len(existingRequest.players)} players with this same request."
-        ret.additional = existingRequest
-
-        Game._LOGGER.log(LogLevel.LEVEL_INFO, ret.responseMsg)
         return ret
 
     def deleteRequest(self, index: int, exempt: bool = False) -> Result:
@@ -360,6 +428,9 @@ for a slot that they do not have on their board."
 
         if not ret.result and not exempt:
             ret.responseMsg = f"There is no outstanding request for index \"{index}\", skipping."
+
+        if ret.result and self.recovery:
+            self.recovery.updateRecovery(self)
 
         Game._LOGGER.log(LogLevel.LEVEL_INFO if ret.result else LogLevel.LEVEL_ERROR, ret.responseMsg)
 
