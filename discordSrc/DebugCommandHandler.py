@@ -28,7 +28,7 @@ from game.Player import Player
 from PIL import Image
 from io import BytesIO
 from unittest.mock import AsyncMock, MagicMock
-from typing import Optional, cast
+from typing import Optional
 
 class DebugCommandHandler(ICommandHandler):
     __LOGGER = ClassLogger(__name__)
@@ -152,8 +152,12 @@ class DebugCommandHandler(ICommandHandler):
             await interaction.response.send_message("Requested call category does not exist in this players card, aborting.", ephemeral=True)
             return
 
-        await interaction.response.send_message("Making call request...", ephemeral=True)
-        _ = game.requestCall(ActionData(interaction=interaction, callRequest=CallRequest(player, requestBing)))
+        if not Config().getConfig('CasualMode', False):
+            await interaction.response.send_message("Making call request...", ephemeral=True)
+            _ = game.requestCall(ActionData(interaction=interaction, callRequest=CallRequest(player, requestBing)))
+        else:
+            await interaction.response.send_message("Marking player board...", ephemeral=True)
+            _ = game.requestCallCasual(ActionData(interaction=interaction, callRequest=CallRequest(player, requestBing)))
 
     @discord.app_commands.describe(player_name="Mock player to get board for")
     @discord.app_commands.checks.has_role(Config().getConfig("GameMasterRole"))

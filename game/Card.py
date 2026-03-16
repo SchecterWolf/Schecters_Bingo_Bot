@@ -13,11 +13,12 @@ import time
 
 from .Bing import Bing
 from .Binglets import Binglets
+from .SimpleCacheTracker import SimpleCacheTracker
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from typing import Dict, List, Optional
 
-class Card:
+class Card(SimpleCacheTracker):
     ROW = 'row'
     COL = 'col'
     DIAG = 'diag'
@@ -26,8 +27,15 @@ class Card:
     _cardSize = 0
 
     def __init__(self, playername: str):
+        super().__init__()
+
         self.playername = playername
         self._initBoard()
+
+        # Get the configured card size if we haven't already
+        if Card._cardSize == 0:
+            Card._LOGGER.log(LogLevel.LEVEL_DEBUG, "Reading in card size config.")
+            Card._cardSize = int(Config().getConfig('CardSize', "0"))
 
     def generateNewCard(self, gameType: str) -> str:
         """
@@ -35,10 +43,6 @@ class Card:
         a unique hash ID for the particular card arrangement.
         """
         Card._LOGGER.log(LogLevel.LEVEL_DEBUG, f"Generating card for player {self.playername}...")
-        # Get the configured card size if we haven't already
-        if Card._cardSize == 0:
-            Card._LOGGER.log(LogLevel.LEVEL_DEBUG, "Reading in card size config.")
-            Card._cardSize = int(Config().getConfig('CardSize', "0"))
         if not Card._cardSize > 0:
             Card._LOGGER.log(LogLevel.LEVEL_CRIT, "Cannot have a 'CardSize' of 0. Aborting game.")
             raise ValueError("Invalid CardSize configuration")
@@ -75,7 +79,7 @@ class Card:
         Card._LOGGER.log(LogLevel.LEVEL_INFO, f"New card generated for player \"{self.playername}\" with ID: {self.cardID}")
         return self.cardID
 
-    def markCell(self, calledBing: Bing) -> bool:
+    def markCell(self, calledBing: Bing, force: bool = False) -> bool:
         """
         Attempts to mark a cell with a given bing string,
         if the card contains the bing string.
@@ -84,7 +88,7 @@ class Card:
         bing = self._getBingCell(calledBing.bingIdx)
         prevBingo = self.hasBingo()
 
-        if bing.bingStr and not bing.marked:
+        if bing.bingStr and (force or not bing.marked):
             Card._LOGGER.log(LogLevel.LEVEL_INFO, f"Player \"{self.playername}\" marked the square ({bing.bingStr})!")
 
             rowCount = self.markedCells[Card.ROW].get(bing.x, 0) + 1
@@ -165,10 +169,11 @@ class Card:
             self.markedCells[Card.DIAG]['A'] = diagA
             self.markedCells[Card.DIAG]['B'] = diagB
 
-            self.bingo = (rowCount == Card._cardSize or
-                          colCount == Card._cardSize or
-                          diagA == Card._cardSize or
-                          diagB == Card._cardSize)
+            if not self.bingo:
+                self.bingo = (rowCount == Card._cardSize or
+                              colCount == Card._cardSize or
+                              diagA == Card._cardSize or
+                              diagB == Card._cardSize)
 
     def _getBingCell(self, index) -> Bing:
         found = Bing("", 0)

@@ -15,6 +15,8 @@ class CallRequest:
     __LOGGER = ClassLogger(__name__)
 
     def __init__(self, player: Player, requestBing: Bing):
+        super().__init__()
+
         self.players: Set[Player] = {player}
         self.requestBing = requestBing
 
@@ -35,6 +37,9 @@ This requests bing index is f{self.requestBing.bingIdx} and the merge's bing ind
     def isMatchingRequest(self, request: "CallRequest") -> bool:
         return request.requestBing.bingIdx == self.requestBing.bingIdx
 
+    def addPlayer(self, player: Player):
+        self.players.add(player)
+
     def removePlayer(self, player: Player):
         self.players.discard(player)
 
@@ -43,4 +48,7 @@ This requests bing index is f{self.requestBing.bingIdx} and the merge's bing ind
 
     def getPrimaryRequester(self) -> Player:
         return Player("", -1) if not self.players else next(iter(self.players))
+
+    def __eq__(self, rhs):
+        return isinstance(rhs, CallRequest) and self.requestBing == rhs.requestBing and self.players == rhs.players
 

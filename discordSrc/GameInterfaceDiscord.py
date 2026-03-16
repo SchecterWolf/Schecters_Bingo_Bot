@@ -30,15 +30,17 @@ from config.Globals import GLOBALVARS
 from game.ActionData import ActionData
 from game.Binglets import Binglets
 from game.CallRequest import CallRequest
-from game.Game import GameState
+from game.Game import Game, GameState
 from game.NotificationMessageMaker import MakePlayersBingoNotif, MakePlayersCallNotif
 from game.Player import Player
+from game.Recovery import Recovery
 from game.Result import Result
 from game.Sync import sync_aware
 
 from typing import Optional, Set, cast
 
 from youtube.GameInterfaceYoutube import GameInterfaceYoutube
+from unittest.mock import AsyncMock, MagicMock
 
 class GameInterfaceDiscord(IAsyncDiscordGame):
     __LOGGER = ClassLogger(__name__)
@@ -53,6 +55,9 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         self.YTiface: Optional[GameInterfaceYoutube] = None
         self.channelAdmin = None
         self.channelBingo = None
+        self.recovery = Recovery(self.gameGuild.guildID)
+
+        self.game.setRecovery(self.recovery)
 
         Config().resetConfig()
         Binglets(gameType).reset()
@@ -66,6 +71,78 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         # Game view states
         self.viewState = GameState.NEW
         self.debugMode = Config().getConfig("Debug", False)
+
+    async def syncronizeWithRecoveredGame(self) -> Result:
+        ret = Result(True)
+
+        # Get the guild object for this server
+        guild: discord.Guild =  await self.bot.fetch_guild(self.gameGuild.guildID)
+        if not guild:
+            GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Failed to retrieve the server object from guild ID ({self.gameGuild.guildID}).")
+            ret.result = False
+            return ret
+
+        # Recover the game
+        game: Optional[Game] = self.recovery.recoverGame(self.gameGuild.persistentStats)
+        if not game:
+            GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Failed to recover the game from the DB.")
+            ret.result = False
+            return ret
+
+        # Set the recovery game to the discord interface
+        self.game = game
+        self.game.setRecovery(self.recovery)
+        Binglets(game.gameType).reset()
+
+        # Set the Bingo and Admin views
+        gameMasterRoleName = Config().getConfig("GameMasterRole", "-")
+        gameMaster = discord.utils.get(guild.roles, name=gameMasterRoleName)
+        self.channelBingo = BingoChannel(self.bot, self.gameGuild)
+        self.channelAdmin = AdminChannel(self.gameGuild, self.game.gameType, gameMaster)
+
+        # Purge the channels of the previous UI before the recovery
+        await self.channelBingo._purgeChannel()
+        await self.channelAdmin._purgeChannel()
+
+        # Setup the youtube iface
+        if self.YTiface:
+            ret = self.YTiface.init()
+
+        # Task processor init
+        if ret.result:
+            self.taskProcessor.init()
+
+        # Set the player DM channels
+        if ret.result:
+            for player in game.players:
+                GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Refreshing DM view for player \"{player.card.getCardOwner()}\"")
+                user: Optional[discord.Member] = await guild.fetch_member(player.userID) if player.userID >= 0 else None
+                if user:
+                    dm_channel = await user.create_dm()
+                    dmChannel = UserDMChannel(self.gameGuild.guildID, dm_channel, player)
+                else:
+                    GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Failed to retrieve guild user ({player.userID})! Adding mock DM, but user will no longer be able to participate!")
+                    mockChannel = AsyncMock(spec=discord.DMChannel)
+                    mockChannel.id = -1
+                    mockChannel.recipient = MagicMock()
+                    mockChannel.type = discord.ChannelType.private
+                    dmChannel = MockUserDMChannel(mockChannel, player)
+                player.ctx = dmChannel
+
+        # Set the discord iface state to "one less" than the game state, and crank the views
+        # since all the UI needs to be refreshed with the correct hooks
+        if ret.result:
+            if game.state.value > 1:
+                self.viewState = GameState(game.state.value - 1)
+            ret = await self._crankStateViews()
+
+        # Add any pending call requests
+        if ret.result:
+            for req in game.requestedCalls:
+                await self.channelAdmin.addCallRequest(req)
+
+        self.initialized = ret.result
+        return ret
 
     async def init(self) -> Result:
         if self.initialized:
@@ -90,7 +167,12 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
 
         # Admin view init
         if ret.result:
-            self.channelAdmin = AdminChannel(self.gameGuild, self.game.gameType)
+            gameMaster = None
+            guild: discord.Guild =  await self.bot.fetch_guild(self.gameGuild.guildID)
+            if guild:
+                gameMasterRoleName = Config().getConfig("GameMasterRole", "-")
+                gameMaster = discord.utils.get(guild.roles, name=gameMasterRoleName)
+            self.channelAdmin = AdminChannel(self.gameGuild, self.game.gameType, gameMaster)
 
         # Set internal states
         if ret.result:
@@ -138,6 +220,13 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         # Set the discord state views
         if ret.result:
             ret = await self._crankStateViews()
+
+        # Send a message to the general channel if configured
+        if ret.result and self.gameGuild.channelGeneral:
+            message = "# \U0001F4E2 " + Config().getFormatConfig("StreamerName", GLOBALVARS.GAME_MSG_STARTED)
+            message += f"\n# \U0001F4E2 {GLOBALVARS.GAME_MSG_DISCORD_JOIN} "
+            message += self.gameGuild.channelBingo.mention
+            await self.gameGuild.channelGeneral.send(message)
 
         if ret.result and self.YTiface:
             self.YTiface.start()
@@ -191,6 +280,11 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
             await self.mee6Controller.issueEXP(players)
 
         await self._crankStateViews()
+
+        # Send a message to the general channel if configured
+        if self.channelBingo and self.gameGuild.channelGeneral:
+            message = "# \U0001F4E2 " + Config().getFormatConfig("StreamerName", GLOBALVARS.GAME_MSG_ENDED)
+            await self.gameGuild.channelGeneral.send(message, file=await self.channelBingo._getLeaderBoardFile())
 
         # Stop the task processor
         self.taskProcessor.stop()
@@ -278,7 +372,7 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         if ret.result:
             ret = self.game.addPlayer(user.display_name, user.id)
 
-        # Start the player DM view
+        # Set the player DM view
         if ret.result and not ret.additional:
             GameInterfaceDiscord.__LOGGER.log(LogLevel.LEVEL_ERROR, "Internal error! Was expecting a play in additionals.")
             ret.result = False
@@ -447,6 +541,35 @@ class GameInterfaceDiscord(IAsyncDiscordGame):
         async with self.lock:
             ret = await self._requestCall(data)
         self.taskProcessor.resume()
+        return ret
+
+    @sync_aware
+    async def requestCallCasual(self, data: ActionData) -> Result:
+        self.taskProcessor.pause()
+        async with self.lock:
+            ret = await self._requestCallCasual(data)
+        self.taskProcessor.resume()
+        return ret
+
+    async def _requestCallCasual(self, data: ActionData) -> Result:
+        callRequest: CallRequest = data.get("callRequest")
+        # Verify initialized
+        if not self.initialized and not self.channelAdmin:
+            return Result(False, response="Discord interface not initialized, cannot handle request.")
+
+        ret = self.game.requestCallCasual(callRequest)
+
+        # Update the players board
+        if ret.result:
+            player: Player = ret.additional
+            notifStr = f"[Slot marked] {callRequest.requestBing.bingStr}"
+            task = TaskUpdateUserDMs(notifStr, player)
+            self.taskProcessor.addTask(task)
+
+        if self.channelBingo:
+            await self.channelBingo.refreshGameStatus()
+
+        self.finalizeAction(data)
         return ret
 
     async def _requestCall(self, data: ActionData) -> Result:

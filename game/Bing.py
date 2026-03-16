@@ -6,9 +6,13 @@ __version__ = "1.0.0"
 __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
-class Bing:
+from .SimpleCacheTracker import SimpleCacheTracker
+
+class Bing(SimpleCacheTracker):
     """POD for a particular bing (Bingo cell)"""
     def __init__(self, bingStr: str, bingIdx: int, category: str = ""):
+        super().__init__()
+
         self.bingStr = bingStr
         self.bingIdx = bingIdx
         self.category = category

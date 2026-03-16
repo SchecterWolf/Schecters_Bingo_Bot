@@ -17,7 +17,9 @@ from discord.ui import Button, View
 from game.ActionData import ActionData
 from game.CallRequest import CallRequest
 from game.GameStore import GameStore
-from game.NotificationMessageMaker import MakeCallRequestNotif
+from game.NotificationMessageMaker import MakeCallRequestNotifWRole
+
+from typing import Optional
 
 class RequestView(View, IContentItem, IGateKeeper):
     __LOGGER = ClassLogger(__name__)
@@ -26,7 +28,7 @@ class RequestView(View, IContentItem, IGateKeeper):
     __btn_reject_label = "Reject Request"
     __btn_reject_id = "reject_req"
 
-    def __init__(self, gameID:int, request: CallRequest):
+    def __init__(self, gameID:int, request: CallRequest, gameMasterRole: Optional[discord.Role]):
         View.__init__(self, timeout=None)
         IContentItem.__init__(self, "Call requests")
         IGateKeeper.__init__(self)
@@ -38,7 +40,8 @@ class RequestView(View, IContentItem, IGateKeeper):
         self.interaction_check = self.interactionCheck
 
         # Set the request caption text
-        self.viewText = MakeCallRequestNotif(self.callRequest)
+        self.mention = gameMasterRole.mention if gameMasterRole else ""
+        self.viewText = MakeCallRequestNotifWRole(self.callRequest, self.mention)
 
         acceptButton = Button(
             label=RequestView.__btn_accept_label,
@@ -61,7 +64,7 @@ This view has request ID ({self.callRequest.requestBing.bingIdx}) and the update
             return
 
         self.callRequest = request
-        self.viewText = MakeCallRequestNotif(self.callRequest)
+        self.viewText = MakeCallRequestNotifWRole(self.callRequest, self.mention)
 
     @require_gamemaster
     async def accept_callback(self, interaction: discord.Interaction):

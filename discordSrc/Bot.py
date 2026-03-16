@@ -9,27 +9,26 @@ __email__ = "--"
 import discord
 
 from .AdminCommandHandler import AdminCommandHandler
+from .AdminChannel import AdminChannel
+from .BingoChannel import BingoChannel
 from .DebugCommandHandler import DebugCommandHandler
 from .GameControllerDiscord import GameControllerDiscord
 from .GameGuild import GameGuild
 from .ICommandHandler import ICommandHandler
-from .LeaderboardCreator import LeaderboardCreator
 from .PlayerCommandHandler import PlayerCommandHandler
-from .StartGameButton import StartGameButton
 
 from config.ClassLogger import ClassLogger, LogLevel
 from config.Config import Config
 from config.Globals import GLOBALVARS
-from config.Version import BOT_VERSION
 
 from discord.client import Client
-from discord.ui import View
 
 from game.GameStore import GameStore
 from game.IGameInterface import IGameInterface
 from game.PersistentStats import PersistentStats
+from game.Recovery import Recovery
 
-from typing import Optional
+from typing import Optional, cast
 
 class Bot(Client):
     __LOGGER = ClassLogger(__name__)
@@ -57,6 +56,8 @@ class Bot(Client):
         self.debugCommands: Optional[DebugCommandHandler] = None
 
         self.initialized = True
+        self.hasRecovery = False
+        self.recovery = None
 
     def runBot(self) -> bool:
         token = ""
@@ -104,20 +105,52 @@ class Bot(Client):
 
         GameStore().addController(GameControllerDiscord(self, self.gameGuilds))
 
+        # Finish starting the recovery game, if any
+        gameController = GameStore().getController()
+        if self.hasRecovery and self.recovery and gameController:
+            Bot.__LOGGER.log(LogLevel.LEVEL_WARN, f"Game recovery found for server ID {self.recovery.gameID}, starting game recovery...")
+            result = await gameController.startGameFromRecovery(self.recovery.gameID)
+
+            # If for whatever reason we couldn't successfully set up the recovery, restart without the setup without the recovery
+            if not result:
+                Bot.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Failed to recover the game. Falling back to init state...")
+                self.recovery.removeRecovery()
+                await self.on_guild_join(self.guilds[0])
+
+            self.hasRecovery = False
+
     async def on_guild_join(self, guild: discord.Guild):
         """
         Called whenever this bot is added to a discord server or when the bot is
         starting up
         """
+        if guild.id in Config().getConfig("SkipServer", []):
+            Bot.__LOGGER.log(LogLevel.LEVEL_CRIT, f"Guild \"{guild.name}\" marked as skiped.... skipping!")
+            return
+
         Bot.__LOGGER.log(LogLevel.LEVEL_INFO, f"Initializing guild: {guild.name}")
         persistentStats = PersistentStats(guild.id)
+        self.recovery = Recovery(guild.id)
+        self.hasRecovery = self.recovery.hasRecovery()
+
+        # If there is a game already in progress, ignore recovery. (This shouldn't ever happen)
+        if GameStore().getGame(guild.id):
+            self.hasRecovery = False
 
         # Get the regular bingo channel
         try:
-            channelBingo = discord.utils.get(guild.text_channels, name=GLOBALVARS.CHANNEL_BINGO)
-            if channelBingo:
-                await channelBingo.purge()
-                await channelBingo.send(GLOBALVARS.GAME_MSG_STARTUP, file=await LeaderboardCreator(self, persistentStats).createAsset())
+            channelBingo = None
+            channelBingoID = Config().getConfig('ChannelBingo')
+            if channelBingoID:
+                channelBingo = guild.get_channel(channelBingoID)
+                if not isinstance(channelBingo, discord.TextChannel):
+                    self.__LOGGER.log(LogLevel.LEVEL_CRIT, f"Bingo Channel ID ({channelBingoID}) does not appear to be a Text Channel. Please make sure to configure a text channel ID.")
+                    channelBingo = None
+
+            if channelBingo and not self.hasRecovery:
+                tempGG = GameGuild(guild.id, persistentStats, channelBingo, channelBingo)
+                bingoChannel = BingoChannel(self, tempGG)
+                await bingoChannel.setViewIdle()
         except Exception as e:
             self.__LOGGER.log(LogLevel.LEVEL_CRIT, f"Could not set up bingo channel for guild {guild.id}: {e}")
             return
@@ -125,23 +158,45 @@ class Bot(Client):
         # Get the bingo admin channel
         try:
             Bot.__LOGGER.log(LogLevel.LEVEL_DEBUG, "Initializing the admin bingo channel for the guild.")
-            channelAdmin = discord.utils.get(guild.text_channels, name=GLOBALVARS.CHANNEL_ADMIN_BINGO)
-            if channelAdmin:
-                await channelAdmin.purge()
 
+            channelAdmin = None
+            channelAdminID = Config().getConfig('ChannelAdmin')
+            if channelAdminID:
+                channelAdmin = guild.get_channel(channelAdminID)
+                if not isinstance(channelAdmin, discord.TextChannel):
+                    self.__LOGGER.log(LogLevel.LEVEL_CRIT, f"Admin Bingo Channel ID ({channelAdminID}) does not appear to be a Text Channel. Please make sure to configure a text channel ID.")
+                    channelAdmin = None
+
+            if channelAdmin and not self.hasRecovery:
                 # Bootstrap the start game button
-                startView = View(timeout=None)
-                startButton = StartGameButton()
-                startButton.addToView(startView)
-                await channelAdmin.send(GLOBALVARS.GAME_MSG_STARTUP, view=startView)
+                tempGG = GameGuild(guild.id, persistentStats, channelAdmin, channelAdmin)
+                adminChannel = AdminChannel(tempGG, "", None)
+                await adminChannel.setViewIdle()
         except Exception as e:
             self.__LOGGER.log(LogLevel.LEVEL_CRIT, f"Could not set up admin channel for guild \"{guild.name}\" ({guild.id}): {e}")
             if channelBingo:
                 await channelBingo.purge()
             return
 
+        # Get the general channel (optional)
+        channelGeneralID = Config().getConfig('ChannelGeneral', 0)
+        channelGeneral: Optional[discord.TextChannel] = None
+        if channelGeneralID:
+            try:
+                channel = guild.get_channel(channelGeneralID)
+                if isinstance(channel, discord.TextChannel):
+                    channelGeneral = cast(discord.TextChannel, channel)
+                else:
+                    self.__LOGGER.log(LogLevel.LEVEL_ERROR, f"General Channel ID ({channelGeneralID}) does not appear to be a Text Channel. Please make sure to configure a text channel ID.")
+            except Exception as e:
+                pass
+
+            if not channelGeneral:
+                self.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Could not find the general channel for configured id {channelGeneralID}, Skipping.")
+
+        # Add this guild to the game guilds
         if channelBingo and channelAdmin:
-            self._addGuild(GameGuild(guild.id, persistentStats, channelBingo, channelAdmin))
+            self._addGuild(GameGuild(guild.id, persistentStats, channelBingo, channelAdmin, channelGeneral))
 
     async def on_guild_remove(self, guild: discord.Guild):
         """
@@ -159,6 +214,7 @@ class Bot(Client):
         if activeGame:
             Bot.__LOGGER.log(LogLevel.LEVEL_WARN, f"Force shutting down active game for guild \"{guild.name}\"...")
             activeGame.destroy()
+            Recovery(guild.id).removeRecovery()
 
         if gg:
             Bot.__LOGGER.log(LogLevel.LEVEL_WARN, f"Guild \"{guild.name}\" has been removed.")

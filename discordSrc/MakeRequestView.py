@@ -49,7 +49,7 @@ class MakeRequestView(View, IContentItem, IGateKeeper):
             MakeRequestView.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Skipping call request selection made with no value selected.")
             return
 
-        MakeRequestView.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Request call selection made: {self.select.values[0]}")
+        MakeRequestView.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Request call selection made ({self.select.values[0]}) for player \"{self._player.card.getCardOwner()}\"({self._player.userID}).")
 
         game = GameStore().getGame(self.gameID)
         bingID = int(self.select.values[0])
@@ -86,6 +86,40 @@ class MakeRequestView(View, IContentItem, IGateKeeper):
             self.select.placeholder = MakeRequestView.__SELECT_PLCHDR
             await interaction.message.edit(view=self)
 
+    async def select_callback_casual(self, interaction: discord.Interaction):
+        if not self.select.values:
+            MakeRequestView.__LOGGER.log(LogLevel.LEVEL_ERROR, f"Skipping call request selection made with no value selected.")
+            return
+
+        MakeRequestView.__LOGGER.log(LogLevel.LEVEL_DEBUG, f"Casual call selection made ({self.select.values[0]}) for player \"{self._player.card.getCardOwner()}\"({self._player.userID}).")
+
+        game = GameStore().getGame(self.gameID)
+        bingID = int(self.select.values[0])
+        requestBing = self._player.card.getBingFromID(bingID)
+
+        if self._interactExpired:
+            await interaction.response.send_message(f"\U0000FE0F Make request is still processing, please wait.")
+        elif not game:
+            await interaction.response.send_message(f"Failed to process request", ephemeral=True)
+        elif not requestBing:
+            errStr = "Requested call category does not exist in this players card, aborting."
+            MakeRequestView.__LOGGER.log(LogLevel.LEVEL_ERROR, errStr)
+            await interaction.response.send_message(errStr, ephemeral=True)
+        elif requestBing.marked:
+            await interaction.response.send_message(f"Slot \"{requestBing.bingStr}\" has already been marked!. If the square is not red, please wait for the board to update.", ephemeral=True)
+        else:
+            self.setInteractExpired()
+            await interaction.response.defer()
+            _ = game.requestCallCasual(ActionData(interaction=interaction,
+                                            callRequest=CallRequest(self._player, requestBing),
+                                            **{ActionData.FINALIZE_FUNCT: self.resetExpired}))
+
+        # Reset the dropdown for the user's view
+        if interaction.message:
+            self.select.values.clear()
+            self.select.placeholder = MakeRequestView.__SELECT_PLCHDR
+            await interaction.message.edit(view=self)
+
     def _buildMenu(self):
         # Get all the unmarked bings from the card in an unsorted manner
         unsortedBings: List[Bing] = []
@@ -103,6 +137,12 @@ class MakeRequestView(View, IContentItem, IGateKeeper):
             placeholder=MakeRequestView.__SELECT_PLCHDR,
             options=options,
             custom_id=MakeRequestView.__SELECT_ID)
-        self.select.callback = self.select_callback
+
+        # Set the Casual select or Regular select depending on the configuration
+        if Config().getConfig('CasualMode', False):
+            self.select.callback = self.select_callback_casual
+        else:
+            self.select.callback = self.select_callback
+
         self.add_item(self.select)
 

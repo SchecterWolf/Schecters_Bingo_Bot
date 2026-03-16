@@ -7,7 +7,6 @@ __maintainer__ = "Schecter Wolf"
 __email__ = "--"
 
 import discord
-import os
 
 from .IChannelInterface import IChannelInterface, ChannelView, verifyView
 from .MakeRequestView import MakeRequestView
@@ -36,6 +35,9 @@ class UserDMChannel(IChannelInterface):
         game = GameStore().getGame(gameID)
         if game:
             self.gameType = game.game.gameType
+
+    async def setViewIdle(self):
+        pass
 
     @verifyView(ChannelView.NEW)
     async def setViewNew(self):

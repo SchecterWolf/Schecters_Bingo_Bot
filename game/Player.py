@@ -9,12 +9,15 @@ __email__ = "--"
 import time
 
 from .Card import Card
+from .SimpleCacheTracker import SimpleCacheTracker
 from typing import Any
 
 BingIndex = int
 
-class Player:
+class Player(SimpleCacheTracker):
     def __init__(self, name: str, userID: int):
+        super().__init__()
+
         self.card = Card(name)
         self.userID = userID
         self.ctx: Any = None
